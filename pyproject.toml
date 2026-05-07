@@ -1,0 +1,24 @@
+[project]
+name = "gencon-event-enricher"
+version = "0.1.0"
+description = "Browse and filter GenCon events, enriched with BGG metadata."
+requires-python = ">=3.12"
+dependencies = [
+    "openpyxl>=3.1",
+    "rapidfuzz>=3.9",
+    "ruamel.yaml>=0.18",
+    "jsonschema>=4.21",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "playwright>=1.45",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+
+[tool.uv]
+package = false

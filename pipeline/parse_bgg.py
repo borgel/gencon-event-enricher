@@ -1,11 +1,11 @@
 """Parse boardgames_ranks-*.csv into an indexed BGG database."""
 from __future__ import annotations
 import csv
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .types import BGGEntry
+from .normalize import normalize_for_match
 
 
 CATEGORY_COLS = (
@@ -13,14 +13,6 @@ CATEGORY_COLS = (
     "familygames_rank", "partygames_rank", "strategygames_rank",
     "thematic_rank", "wargames_rank",
 )
-
-
-def _name_normalize(s: str) -> str:
-    """Local normalizer for the BGG name index. Task 8 introduces a richer one;
-    this is intentionally minimal so parse_bgg has no upward dependency."""
-    s = s.lower()
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    return s.strip()
 
 
 def _to_int(v: str) -> int | None:
@@ -72,6 +64,6 @@ def parse_bgg_csv(path: Path) -> BGGDatabase:
                 category_ranks=cat_ranks,
             )
             db.entries_by_id[id_] = entry
-            key = _name_normalize(entry.name)
+            key = normalize_for_match(entry.name)
             db.ids_by_normalized_name.setdefault(key, set()).add(id_)
     return db

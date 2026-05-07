@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from rapidfuzz import process, fuzz
+
 from .mappings import MappingEntry
+from .normalize import normalize_for_match
 from .parse_bgg import BGGDatabase
 from .types import BGGEntry, MatchSource
 
@@ -21,9 +24,6 @@ class _NoOverride:
 
 
 NO_OVERRIDE: Final = _NoOverride()
-
-
-from .normalize import normalize_for_match
 
 
 def match_overrides(
@@ -64,3 +64,64 @@ def match_exact(title: str, game_system: str, bgg: BGGDatabase) -> MatchResult |
             chosen_id = min(ids)
             return MatchResult(bgg=bgg.entries_by_id[chosen_id], source="exact")
     return None
+
+
+def match_fuzzy(
+    title: str, game_system: str, bgg: BGGDatabase, *, threshold: int = 90
+) -> MatchResult | None:
+    """Pick the highest-scoring BGG name across (title, game_system) using
+    token_set_ratio. Below threshold, return None."""
+    candidates = list(bgg.ids_by_normalized_name.keys())
+    if not candidates:
+        return None
+
+    best_score = -1.0
+    best_norm = None
+    for q in (title, game_system):
+        q_norm = normalize_for_match(q)
+        if not q_norm:
+            continue
+        result = process.extractOne(q_norm, candidates, scorer=fuzz.token_set_ratio)
+        if result is None:
+            continue
+        match_str, score, _ = result
+        if score > best_score:
+            best_score = score
+            best_norm = match_str
+
+    if best_norm is None or best_score < threshold:
+        return None
+
+    chosen_id = min(bgg.ids_by_normalized_name[best_norm])
+    return MatchResult(
+        bgg=bgg.entries_by_id[chosen_id],
+        source="fuzzy",
+        score=float(best_score),
+    )
+
+
+def fuzzy_top_candidates(
+    title: str, game_system: str, bgg: BGGDatabase, *, n: int = 5
+) -> list[tuple[BGGEntry, float]]:
+    """Top-n candidates with scores, regardless of threshold. Used for agent input."""
+    candidates = list(bgg.ids_by_normalized_name.keys())
+    if not candidates:
+        return []
+    pairs: list[tuple[str, float]] = []
+    for q in (title, game_system):
+        q_norm = normalize_for_match(q)
+        if not q_norm:
+            continue
+        results = process.extract(q_norm, candidates, scorer=fuzz.token_set_ratio, limit=n)
+        for match_str, score, _ in results:
+            pairs.append((match_str, float(score)))
+    # Dedupe by name, keep best score
+    by_name: dict[str, float] = {}
+    for n_, sc in pairs:
+        if n_ not in by_name or sc > by_name[n_]:
+            by_name[n_] = sc
+    sorted_pairs = sorted(by_name.items(), key=lambda x: -x[1])[:n]
+    return [
+        (bgg.entries_by_id[min(bgg.ids_by_normalized_name[name])], score)
+        for name, score in sorted_pairs
+    ]

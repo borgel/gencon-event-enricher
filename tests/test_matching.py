@@ -112,3 +112,35 @@ def test_exact_picks_lowest_id_on_collision():
     db.ids_by_normalized_name = {"catan": {100, 500}}
     result = match_exact("Catan", "", db)
     assert result.bgg.id == 100
+
+
+def test_fuzzy_match_minor_variant():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_fuzzy
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Wingspan: Asia", year_published=2022, rank=142,
+        bayesaverage=7.84, average=8.05, users_rated=14000,
+        is_expansion=True, category_ranks={"strategygames": 44},
+    )
+    db.ids_by_normalized_name = {"wingspan asia": {100}}
+    # Title with extra noise that exact would miss
+    result = match_fuzzy("Wingspan Asia Tournament", "Wingspan: Asia", db, threshold=90)
+    assert result is not None
+    assert result.bgg.id == 100
+    assert result.source == "fuzzy"
+    assert result.score >= 90
+
+
+def test_fuzzy_below_threshold_no_match():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_fuzzy
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Brass: Birmingham", year_published=2018,
+        rank=1, bayesaverage=8.39, average=8.56, users_rated=58000,
+        is_expansion=False, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"brass birmingham": {100}}
+    result = match_fuzzy("Cosplay 101", "", db, threshold=90)
+    assert result is None

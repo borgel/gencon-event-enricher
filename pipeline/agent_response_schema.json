@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "agent-response",
+  "type": "object",
+  "required": ["matches"],
+  "additionalProperties": false,
+  "properties": {
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "bgg_id", "confidence", "reasoning"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "minLength": 1 },
+          "bgg_id": { "type": ["integer", "null"] },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "reasoning": { "type": "string", "maxLength": 500 }
+        }
+      }
+    }
+  }
+}

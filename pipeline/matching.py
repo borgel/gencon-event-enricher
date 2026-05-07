@@ -8,7 +8,7 @@ from rapidfuzz import process, fuzz
 from .mappings import MappingEntry
 from .normalize import normalize_for_match
 from .parse_bgg import BGGDatabase
-from .types import BGGEntry, MatchSource
+from .types import BGGEntry, EventGroup, MatchSource
 
 
 @dataclass
@@ -125,3 +125,24 @@ def fuzzy_top_candidates(
         (bgg.entries_by_id[min(bgg.ids_by_normalized_name[name])], score)
         for name, score in sorted_pairs
     ]
+
+
+def match_group(
+    group: EventGroup,
+    manual: dict[str, MappingEntry],
+    agent: dict[str, MappingEntry],
+    bgg: BGGDatabase,
+    *,
+    fuzzy_threshold: int = 90,
+) -> MatchResult | None:
+    """Run the four-stage cascade. Returns None if no match (or null override)."""
+    override = match_overrides(group.key, manual, agent, bgg)
+    if override is None:           # null override: confirmed no match
+        return None
+    if isinstance(override, MatchResult):
+        return override
+    # NO_OVERRIDE — try exact, then fuzzy.
+    exact = match_exact(group.title, group.game_system, bgg)
+    if exact is not None:
+        return exact
+    return match_fuzzy(group.title, group.game_system, bgg, threshold=fuzzy_threshold)

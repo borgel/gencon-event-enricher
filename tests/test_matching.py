@@ -144,3 +144,98 @@ def test_fuzzy_below_threshold_no_match():
     db.ids_by_normalized_name = {"brass birmingham": {100}}
     result = match_fuzzy("Cosplay 101", "", db, threshold=90)
     assert result is None
+
+
+def test_cascade_prefers_manual():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_group
+    from pipeline.types import EventGroup
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Wingspan: Asia", year_published=2022, rank=142,
+        bayesaverage=7.84, average=8.05, users_rated=14000,
+        is_expansion=True, category_ranks={},
+    )
+    db.entries_by_id[999] = BGGEntry(
+        id=999, name="Manual Override Target", year_published=2024,
+        rank=None, bayesaverage=None, average=None, users_rated=0,
+        is_expansion=False, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"wingspan asia": {100}, "manual override target": {999}}
+
+    g = EventGroup(
+        key="K1", title="Wingspan: Asia", event_type="BGM",
+        event_type_label="BGM - Board Game", game_system="Wingspan: Asia",
+        short_description="", long_description="", tournament=False,
+        min_players=1, max_players=4, age_required="", experience_required="",
+        duration_minutes=240, cost=0.0, sessions=[],
+    )
+    manual = {"K1": MappingEntry(bgg_id=999)}
+    result = match_group(g, manual, {}, db)
+    assert result.bgg.id == 999
+    assert result.source == "manual"
+
+
+def test_cascade_falls_through_to_fuzzy():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_group
+    from pipeline.types import EventGroup
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Wingspan: Asia", year_published=2022, rank=142,
+        bayesaverage=7.84, average=8.05, users_rated=14000,
+        is_expansion=True, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"wingspan asia": {100}}
+
+    g = EventGroup(
+        key="K1", title="Wingspan Asia Tournament Round 1",
+        event_type="BGM", event_type_label="BGM - Board Game",
+        game_system="Wingspan: Asia",
+        short_description="", long_description="", tournament=False,
+        min_players=1, max_players=4, age_required="", experience_required="",
+        duration_minutes=240, cost=0.0, sessions=[],
+    )
+    result = match_group(g, {}, {}, db)
+    # title doesn't exact-match because of "Tournament Round 1", so it fuzzes.
+    # game_system "Wingspan: Asia" exact-matches first, so source=exact.
+    assert result.source == "exact"
+    assert result.bgg.id == 100
+
+
+def test_cascade_returns_none_when_unmatched():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_group
+    from pipeline.types import EventGroup
+    db = BGGDatabase()
+    g = EventGroup(
+        key="SEM-cosplay", title="Cosplay 101", event_type="SEM",
+        event_type_label="SEM - Seminar", game_system="",
+        short_description="", long_description="", tournament=False,
+        min_players=1, max_players=50, age_required="", experience_required="",
+        duration_minutes=60, cost=0.0, sessions=[],
+    )
+    assert match_group(g, {}, {}, db) is None
+
+
+def test_cascade_respects_null_override():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_group
+    from pipeline.types import EventGroup
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Cosplay", year_published=2020, rank=None,
+        bayesaverage=None, average=None, users_rated=0,
+        is_expansion=False, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"cosplay": {100}}
+    g = EventGroup(
+        key="SEM-cosplay-101", title="Cosplay", event_type="SEM",
+        event_type_label="SEM - Seminar", game_system="",
+        short_description="", long_description="", tournament=False,
+        min_players=1, max_players=50, age_required="", experience_required="",
+        duration_minutes=60, cost=0.0, sessions=[],
+    )
+    # Even though "Cosplay" exact-matches a BGG id, the manual null says no.
+    manual = {"SEM-cosplay-101": MappingEntry(bgg_id=None)}
+    assert match_group(g, manual, {}, db) is None

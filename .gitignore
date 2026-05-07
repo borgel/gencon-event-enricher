@@ -1,0 +1,6 @@
+.superpowers/
+.worktrees/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store

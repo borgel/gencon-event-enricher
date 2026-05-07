@@ -1,7 +1,7 @@
 """Serialize the in-memory pipeline state to JSON outputs."""
 from __future__ import annotations
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from .types import EventGroup, SessionRecord, BGGEntry
@@ -69,7 +69,7 @@ def build_events_json(
     blob = {
         "groups": [_group_to_dict(g) for g in groups],
         "meta": {
-            "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
             "gencon_source": gencon_source,
             "bgg_source": bgg_source,
             "stats": {

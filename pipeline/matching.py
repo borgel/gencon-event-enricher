@@ -23,6 +23,9 @@ class _NoOverride:
 NO_OVERRIDE: Final = _NoOverride()
 
 
+from .normalize import normalize_for_match
+
+
 def match_overrides(
     key: str,
     manual: dict[str, MappingEntry],
@@ -48,3 +51,16 @@ def match_overrides(
                 continue
             return MatchResult(bgg=bgg_entry, source=source)
     return NO_OVERRIDE
+
+
+def match_exact(title: str, game_system: str, bgg: BGGDatabase) -> MatchResult | None:
+    """Try Title first, then Game System. Among ties, prefer lower BGG id."""
+    for candidate in (title, game_system):
+        if not candidate:
+            continue
+        norm = normalize_for_match(candidate)
+        ids = bgg.ids_by_normalized_name.get(norm)
+        if ids:
+            chosen_id = min(ids)
+            return MatchResult(bgg=bgg.entries_by_id[chosen_id], source="exact")
+    return None

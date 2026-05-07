@@ -50,3 +50,65 @@ def test_no_override_returns_sentinel():
     from pipeline.matching import NO_OVERRIDE
     result = match_overrides("K2", {}, {}, _bgg_db())
     assert result is NO_OVERRIDE
+
+
+def test_exact_match_on_title():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_exact
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Brass: Birmingham", year_published=2018, rank=1,
+        bayesaverage=8.39, average=8.56, users_rated=58000,
+        is_expansion=False, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"brass birmingham": {100}}
+    result = match_exact("Brass: Birmingham — Learn & Play", "Brass: Birmingham", db)
+    # Either field can produce a match; with this title and game_system both work
+    assert result is not None
+    assert result.bgg.id == 100
+    assert result.source == "exact"
+
+
+def test_exact_match_falls_back_to_game_system():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_exact
+    db = BGGDatabase()
+    db.entries_by_id[200] = BGGEntry(
+        id=200, name="Marvel Super Heroes", year_published=1984,
+        rank=None, bayesaverage=None, average=None, users_rated=0,
+        is_expansion=False, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"marvel super heroes": {200}}
+    # The Title is an RPG scenario name; the Game System is the canonical game.
+    result = match_exact("Hellfire in the Heartland, 1938", "Marvel Super Heroes", db)
+    assert result is not None
+    assert result.bgg.id == 200
+
+
+def test_exact_no_match_returns_none():
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_exact
+    db = BGGDatabase()
+    result = match_exact("Whatever", "Whatever", db)
+    assert result is None
+
+
+def test_exact_picks_lowest_id_on_collision():
+    """If two BGG entries normalize to the same name, prefer the one with the
+    lowest id (BGG's lower ids tend to be the canonical/older entry)."""
+    from pipeline.parse_bgg import BGGDatabase
+    from pipeline.matching import match_exact
+    db = BGGDatabase()
+    db.entries_by_id[100] = BGGEntry(
+        id=100, name="Catan", year_published=1995, rank=200,
+        bayesaverage=7.0, average=7.1, users_rated=10000,
+        is_expansion=False, category_ranks={},
+    )
+    db.entries_by_id[500] = BGGEntry(
+        id=500, name="Catan", year_published=2020, rank=None,
+        bayesaverage=None, average=None, users_rated=0,
+        is_expansion=True, category_ranks={},
+    )
+    db.ids_by_normalized_name = {"catan": {100, 500}}
+    result = match_exact("Catan", "", db)
+    assert result.bgg.id == 100

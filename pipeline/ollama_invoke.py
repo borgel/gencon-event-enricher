@@ -43,7 +43,8 @@ def invoke_ollama(
         "format": "json",
         "options": {
             "num_ctx": num_ctx,
-            "temperature": 0.0,   # deterministic — matching, not creative
+            "num_predict": 16384,  # generous output cap; default can truncate large batches
+            "temperature": 0.0,    # deterministic — matching, not creative
         },
     }).encode("utf-8")
 

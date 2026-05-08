@@ -12,29 +12,58 @@ from typing import Any
 SYSTEM_INSTRUCTIONS = dedent("""\
     You are mapping GenCon events to BoardGameGeek (BGG) entries.
 
+    SCOPE — VERY IMPORTANT:
+    The BGG data we have is the BOARD GAME database (bg_ranks dump). It
+    contains: board games, card games, miniatures games (Warhammer, etc.),
+    and their expansions. It does NOT contain:
+    - Roleplaying games (D&D, Pathfinder, Daggerheart, Cy_Borg, Mörk Borg,
+      Call of Cthulhu, Vampire, Shadowrun, FATE, GURPS, Hero System, etc.).
+      RPGs are a different BGG database we don't have access to.
+    - Seminars, panels, workshops, art shows, autograph sessions, dance
+      parties, cosplay events, painting/crafting sessions, kids' activities
+      that aren't a specific game.
+    - Most LARP and live-action events.
+
+    For ANY event in the above categories, return bgg_id: null with
+    confidence "high". The event's `event_type_label` is your strongest
+    hint — anything starting with "RPG", "SEM", "TRD", "LRP", "WKS", or
+    "MHE" (miniatures hobby/painting events) is almost certainly null.
+
     Inputs:
     - A CSV of popular BGG entries (id, name, yearpublished, bayesaverage,
-      is_expansion). This is a curated subset of the BGG database covering
-      the most-rated games.
+      is_expansion).
     - For each batch, an optional CSV of additional BGG entries that fuzzy
-      matching surfaced as candidates for events in this batch (these may
-      not appear in the popular list).
+      matching surfaced as candidates for events in this batch.
     - A list of unmatched GenCon event groups. Each has a stable `key`, the
-      event title, event type label, game system (often the canonical game
-      name for RPGs and miniatures games), a short description, and up to 5
-      fuzzy-match candidates from the BGG list ranked by score.
+      event title, event type label, game system, a short description, and
+      up to 5 fuzzy-match candidates ranked by score. A high fuzzy score
+      does NOT mean a real match — fuzzy is noisy and surfaces substring
+      coincidences (e.g., "The Night" matches anything with "night" in it).
 
     For each event, decide:
-    - If the event clearly maps to a BGG entry, return that entry's id.
-    - If the event is not a tabletop game and has no BGG entry (cosplay,
-      seminars, dance parties, art shows, autograph sessions, video games,
-      escape rooms unless they have a BGG entry, etc.), return bgg_id: null.
-    - If you genuinely cannot decide, prefer null with confidence "low".
+    - If the event_type is RPG/SEM/TRD/LRP/WKS/MHE → bgg_id: null, high.
+    - If the event clearly IS a board/card/miniatures game in the BGG
+      list provided (matched by full game name, NOT a substring), return
+      that BGG id. Use the title and game_system fields to determine
+      what game the event is actually about.
+    - Otherwise, prefer null over a guess. A wrong id is worse than null.
 
-    Use the fuzzy candidates as a starting hint, but verify against the
-    BGG entries provided. Prefer non-expansion entries when both a base
-    game and an expansion match (unless the event title clearly names the
-    expansion).
+    Confidence — REPORT IT HONESTLY:
+    - "high": you are certain. Use this when the event explicitly names a
+      BGG entry (e.g., title or game_system contains the canonical name),
+      OR when an obvious-null rule applies (RPG/SEM/TRD/etc.).
+    - "medium": probable but not verified. Use sparingly.
+    - "low": you guessed or had to break a tie. ALWAYS use "low" if you
+      are returning a bgg_id you wouldn't bet $100 on. We would much
+      rather have a "low: null" than a "high: wrong_id" — null entries
+      are easy to revisit later, while a confidently-wrong id silently
+      contaminates the dataset.
+
+    A high fuzzy score (e.g. 100) on a candidate is NOT enough evidence
+    by itself — fuzzy scores are token-overlap, so "Operation" matches
+    "Operation Virus Bomb (Warhammer 40K)" with score 100 even though
+    they are unrelated. Verify the candidate name actually corresponds
+    to the game described in the event before using it.
 
     Respond ONLY with a JSON object matching this exact schema (no prose,
     no markdown fences):

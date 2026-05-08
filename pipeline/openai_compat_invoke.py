@@ -9,10 +9,16 @@ Works with any server that implements POST /v1/chat/completions:
 
 Returns a string envelope shaped like Claude's so parse_response() works
 unchanged across all backends.
+
+We send response_format={type:json_schema} with the agent's response schema
+embedded — this is required by LM Studio (it rejects json_object) and works
+on OpenAI proper. Servers that don't grok json_schema can fall back via
+the --no-strict-schema flag (sends type:json_object instead).
 """
 from __future__ import annotations
 import json
 import os
+from pathlib import Path
 from typing import Optional
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -28,6 +34,25 @@ DEFAULT_OPENAI_MODEL = os.environ.get(
 )
 
 
+_SCHEMA_PATH = Path(__file__).parent / "agent_response_schema.json"
+_AGENT_RESPONSE_SCHEMA = json.loads(_SCHEMA_PATH.read_text())
+
+
+def _response_format(strict: bool) -> dict:
+    if strict:
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "agent_response",
+                "strict": True,
+                # Some servers (OpenAI strict mode, LM Studio) require the
+                # schema to live under "schema"; pass it directly.
+                "schema": _AGENT_RESPONSE_SCHEMA,
+            },
+        }
+    return {"type": "json_object"}
+
+
 def invoke_openai(
     prompt: str,
     *,
@@ -36,6 +61,7 @@ def invoke_openai(
     api_key: Optional[str] = None,
     timeout: float = 1800.0,
     max_tokens: int = 16384,
+    strict_schema: bool = True,
 ) -> str:
     """POST to <base_url>/chat/completions, wrap response so parse_response accepts it.
 
@@ -45,15 +71,17 @@ def invoke_openai(
     Local servers usually ignore the API key but reject missing Authorization
     headers, so we send a placeholder. Set OPENAI_API_KEY (or pass api_key=)
     to talk to OpenAI proper.
+
+    `strict_schema=True` (default) sends response_format=json_schema with our
+    agent_response_schema.json embedded. LM Studio requires this. Set False
+    to fall back to json_object for servers that don't support json_schema.
     """
     api_key = api_key or os.environ.get("OPENAI_API_KEY") or "not-needed"
 
     body = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        # Most OpenAI-compat servers honor json_object; LM Studio also supports
-        # json_schema for stricter constraints. json_object is the broadest.
-        "response_format": {"type": "json_object"},
+        "response_format": _response_format(strict_schema),
         "temperature": 0.0,
         "max_tokens": max_tokens,
     }).encode("utf-8")

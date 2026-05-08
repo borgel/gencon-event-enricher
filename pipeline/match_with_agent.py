@@ -116,7 +116,11 @@ DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL
 
 
 def _build_default_invoker(
-    backend: str, model: Optional[str], *, base_url: Optional[str] = None,
+    backend: str,
+    model: Optional[str],
+    *,
+    base_url: Optional[str] = None,
+    strict_schema: bool = True,
 ):
     if backend == "claude":
         m = model or DEFAULT_CLAUDE_MODEL
@@ -127,7 +131,7 @@ def _build_default_invoker(
     if backend == "openai":
         m = model or DEFAULT_OPENAI_MODEL
         u = base_url or DEFAULT_OPENAI_BASE_URL
-        return lambda p: invoke_openai(p, model=m, base_url=u)
+        return lambda p: invoke_openai(p, model=m, base_url=u, strict_schema=strict_schema)
     raise ValueError(
         f"unknown backend: {backend!r} (expected 'claude', 'ollama', or 'openai')"
     )
@@ -166,6 +170,7 @@ def run(
     backend: str = DEFAULT_BACKEND,
     model: Optional[str] = None,
     base_url: Optional[str] = None,
+    strict_schema: bool = True,
     batch_size: Optional[int] = None,
     popular_top_n: Optional[int] = None,
     limit: Optional[int] = None,
@@ -175,7 +180,9 @@ def run(
     # If the caller didn't supply a custom invoker, build one for the
     # selected backend. Tests pass their own invoker, which is unaffected.
     if invoker is None:
-        invoker = _build_default_invoker(backend, model, base_url=base_url)
+        invoker = _build_default_invoker(
+            backend, model, base_url=base_url, strict_schema=strict_schema,
+        )
     effective_model = model or (
         DEFAULT_OPENAI_MODEL if backend == "openai" else
         DEFAULT_OLLAMA_MODEL if backend == "ollama" else
@@ -340,6 +347,11 @@ def main(argv: list[str] | None = None) -> int:
                         help=("base URL for --backend openai. defaults to "
                               f"{DEFAULT_OPENAI_BASE_URL} (mlx-lm). use "
                               "http://localhost:1234/v1 for LM Studio, etc."))
+    parser.add_argument("--no-strict-schema", action="store_true",
+                        help=("for --backend openai: send response_format="
+                              "json_object instead of json_schema. use this "
+                              "if your server doesn't support json_schema "
+                              "(e.g. some older versions of mlx-lm)."))
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="print per-batch progress + cost as the run proceeds")
     ns = parser.parse_args(argv)
@@ -358,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=ns.backend,
         model=ns.model,
         base_url=ns.base_url,
+        strict_schema=not ns.no_strict_schema,
         batch_size=ns.batch_size,
         popular_top_n=ns.popular_bgg_size,
         limit=ns.limit,

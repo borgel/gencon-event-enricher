@@ -66,7 +66,8 @@ def test_envelope_parses_through_agent_response():
     assert matches[1].bgg_id is None
 
 
-def test_request_body_shape():
+def test_request_body_shape_strict_schema_default():
+    """Default mode sends response_format=json_schema with our agent schema."""
     captured = {}
 
     def fake_urlopen(req, timeout=None):
@@ -87,9 +88,26 @@ def test_request_body_shape():
     assert captured["headers"]["Authorization"] == "Bearer sk-test"
     assert captured["data"]["model"] == "custom-model"
     assert captured["data"]["messages"] == [{"role": "user", "content": "hello"}]
-    assert captured["data"]["response_format"] == {"type": "json_object"}
+    rf = captured["data"]["response_format"]
+    assert rf["type"] == "json_schema"
+    assert rf["json_schema"]["name"] == "agent_response"
+    assert rf["json_schema"]["strict"] is True
+    assert "matches" in rf["json_schema"]["schema"]["properties"]
     assert captured["data"]["temperature"] == 0.0
     assert captured["data"]["max_tokens"] == 4096
+
+
+def test_request_body_strict_schema_disabled():
+    """strict_schema=False falls back to looser json_object (for older servers)."""
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["data"] = json.loads(req.data)
+        return _fake_response(_ok_payload('{"matches": []}'))
+
+    with patch("pipeline.openai_compat_invoke.urlopen", side_effect=fake_urlopen):
+        invoke_openai("hello", strict_schema=False)
+    assert captured["data"]["response_format"] == {"type": "json_object"}
 
 
 def test_trailing_slash_in_base_url_normalized():

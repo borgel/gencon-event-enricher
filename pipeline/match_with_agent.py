@@ -71,17 +71,27 @@ def _bgg_csv_subset(bgg_path: Path, *, popular_top_n: int, force_ids: set[int]) 
     return "\n".join(out_lines)
 
 
+DEFAULT_MODEL = "claude-haiku-4-5"
+
+
 def run(
     *,
     agent_input_path: Path,
     bgg_path: Path,
     manual_path: Path,
     agent_path: Path,
-    invoker: ClaudeInvoker = invoke_claude_cli,
+    invoker: Optional[ClaudeInvoker] = None,
+    model: Optional[str] = DEFAULT_MODEL,
     batch_size: int = 50,
     limit: Optional[int] = None,
     dry_run: bool = False,
 ) -> RunSummary:
+    # If the caller didn't supply a custom invoker, build one bound to the
+    # selected model. Tests pass their own invoker (which ignores model).
+    if invoker is None:
+        def invoker(prompt: str) -> str:
+            return invoke_claude_cli(prompt, model=model)
+
     summary = RunSummary()
     blob = json.loads(agent_input_path.read_text())
     items: list[dict] = blob.get("unmatched", [])
@@ -156,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="cap the number of unmatched items processed in this run")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the prompt(s) without invoking claude")
+    parser.add_argument("--model", default=DEFAULT_MODEL,
+                        help=f"Claude model to use (default: {DEFAULT_MODEL})")
     ns = parser.parse_args(argv)
 
     import glob
@@ -172,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         batch_size=ns.batch_size,
         limit=ns.limit,
         dry_run=ns.dry_run,
+        model=ns.model,
     )
     print("Agent runner summary:")
     print(f"  batches_run:           {summary.batches_run}")

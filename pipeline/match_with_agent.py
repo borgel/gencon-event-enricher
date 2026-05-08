@@ -26,30 +26,49 @@ class RunSummary:
     skipped_already_mapped: int = 0
 
 
-def _slim_bgg_csv(bgg_path: Path) -> str:
-    """Read the full BGG CSV but project to only the columns the agent needs.
+def _quote(s: str) -> str:
+    if "," in s or '"' in s:
+        return '"' + s.replace('"', '""') + '"'
+    return s
 
-    Keeping the prompt smaller helps both context size and cost. We include
-    id/name/year/bayesaverage/is_expansion. Skip "Not Ranked" -> empty rows is fine.
+
+def _bgg_csv_subset(bgg_path: Path, *, popular_top_n: int, force_ids: set[int]) -> str:
+    """Build a slim BGG CSV containing the popular_top_n most-rated games plus
+    every BGG id in force_ids (typically the candidate ids from the current batch).
+
+    Why slimmed: the full BGG dump is ~177k entries / ~9 MB, well past Claude's
+    1M-token context. We take the most-rated games as the broad "any reasonable
+    board game the agent might recognize" set, and unconditionally include the
+    candidates we already surfaced via fuzzy matching for the current batch.
     """
-    out_lines = ["id,name,yearpublished,bayesaverage,is_expansion"]
     import csv
+    rows: list[tuple[int, list[str]]] = []
     with open(bgg_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            out_lines.append(",".join([
+            try:
+                users = int(row.get("usersrated", "") or "0")
+            except ValueError:
+                users = 0
+            id_ = int(row["id"])
+            rows.append((users, [
                 row["id"], _quote(row["name"]),
                 row.get("yearpublished", ""),
                 row.get("bayesaverage", ""),
                 row.get("is_expansion", "0"),
             ]))
+
+    # Top N by users_rated, descending.
+    rows.sort(key=lambda r: -r[0])
+    popular = rows[:popular_top_n]
+
+    # Force-include any candidate ids that didn't make the popular cut.
+    popular_ids = {int(r[1][0]) for r in popular}
+    extras = [r for r in rows if int(r[1][0]) in force_ids and int(r[1][0]) not in popular_ids]
+
+    out_lines = ["id,name,yearpublished,bayesaverage,is_expansion"]
+    out_lines.extend(",".join(cells) for _, cells in popular + extras)
     return "\n".join(out_lines)
-
-
-def _quote(s: str) -> str:
-    if "," in s or '"' in s:
-        return '"' + s.replace('"', '""') + '"'
-    return s
 
 
 def run(
@@ -78,10 +97,17 @@ def run(
     if not items:
         return summary
 
-    bgg_csv = _slim_bgg_csv(bgg_path)
-
     for i in range(0, len(items), batch_size):
         batch = items[i:i + batch_size]
+        # Per-batch BGG slice: top 5k most-rated games + every candidate id
+        # referenced by events in this batch. Keeps the prompt under context
+        # while still giving the agent a real catalog to verify against.
+        force_ids: set[int] = set()
+        for event in batch:
+            for cand in event.get("candidates", []):
+                if isinstance(cand.get("bgg_id"), int):
+                    force_ids.add(cand["bgg_id"])
+        bgg_csv = _bgg_csv_subset(bgg_path, popular_top_n=5000, force_ids=force_ids)
         prompt = build_prompt(batch, bgg_csv)
         if dry_run:
             print(f"--- batch {i // batch_size + 1} ({len(batch)} items) ---")

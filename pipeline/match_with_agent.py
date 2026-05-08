@@ -33,17 +33,17 @@ def _quote(s: str) -> str:
     return s
 
 
-def _bgg_csv_subset(bgg_path: Path, *, popular_top_n: int, force_ids: set[int]) -> str:
-    """Build a slim BGG CSV containing the popular_top_n most-rated games plus
-    every BGG id in force_ids (typically the candidate ids from the current batch).
+_BGG_HEADER = "id,name,yearpublished,bayesaverage,is_expansion"
 
-    Why slimmed: the full BGG dump is ~177k entries / ~9 MB, well past Claude's
-    1M-token context. We take the most-rated games as the broad "any reasonable
-    board game the agent might recognize" set, and unconditionally include the
-    candidates we already surfaced via fuzzy matching for the current batch.
+
+def _read_bgg_rows(bgg_path: Path) -> list[tuple[int, int, list[str]]]:
+    """Read BGG CSV once and project to the columns the agent needs.
+
+    Returns list of (users_rated, bgg_id, [csv_cells]) suitable for sorting
+    and partitioning between the popular slice and the per-batch extras.
     """
     import csv
-    rows: list[tuple[int, list[str]]] = []
+    rows: list[tuple[int, int, list[str]]] = []
     with open(bgg_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -51,25 +51,43 @@ def _bgg_csv_subset(bgg_path: Path, *, popular_top_n: int, force_ids: set[int]) 
                 users = int(row.get("usersrated", "") or "0")
             except ValueError:
                 users = 0
-            id_ = int(row["id"])
-            rows.append((users, [
+            cells = [
                 row["id"], _quote(row["name"]),
                 row.get("yearpublished", ""),
                 row.get("bayesaverage", ""),
                 row.get("is_expansion", "0"),
-            ]))
+            ]
+            rows.append((users, int(row["id"]), cells))
+    return rows
 
-    # Top N by users_rated, descending.
-    rows.sort(key=lambda r: -r[0])
-    popular = rows[:popular_top_n]
 
-    # Force-include any candidate ids that didn't make the popular cut.
-    popular_ids = {int(r[1][0]) for r in popular}
-    extras = [r for r in rows if int(r[1][0]) in force_ids and int(r[1][0]) not in popular_ids]
+def _popular_bgg_csv(rows: list[tuple[int, int, list[str]]], top_n: int) -> tuple[str, set[int]]:
+    """Top-N rows by users_rated. Stable across batches in a run, so the
+    Claude prompt cache reuses it. Returns (csv_text, set_of_ids_in_csv)."""
+    sorted_rows = sorted(rows, key=lambda r: -r[0])[:top_n]
+    out = [_BGG_HEADER]
+    out.extend(",".join(cells) for _, _, cells in sorted_rows)
+    return "\n".join(out), {bgg_id for _, bgg_id, _ in sorted_rows}
 
-    out_lines = ["id,name,yearpublished,bayesaverage,is_expansion"]
-    out_lines.extend(",".join(cells) for _, cells in popular + extras)
-    return "\n".join(out_lines)
+
+def _extras_bgg_csv(
+    rows: list[tuple[int, int, list[str]]],
+    *,
+    force_ids: set[int],
+    popular_ids: set[int],
+) -> str:
+    """Per-batch CSV: only the candidate ids that didn't make the popular cut.
+
+    Empty when every candidate is already in the popular slice — in that case
+    the prompt suffix omits the 'additional candidates' block entirely, which
+    is fine for caching: only the suffix differs per batch.
+    """
+    extras = [(uid, cells) for _, uid, cells in rows if uid in force_ids and uid not in popular_ids]
+    if not extras:
+        return ""
+    out = [_BGG_HEADER]
+    out.extend(",".join(cells) for _, cells in extras)
+    return "\n".join(out)
 
 
 DEFAULT_MODEL = "claude-haiku-4-5"
@@ -136,21 +154,25 @@ def run(
               f"skipping {summary.skipped_already_mapped} already-mapped)",
               file=sys.stderr, flush=True)
 
+    # Read BGG once and build the cacheable popular slice once.
+    # Per-batch we only build a small "extras" CSV with candidate ids that
+    # didn't make the popular cut, so the prompt prefix stays byte-identical
+    # across batches and Claude's prompt cache hits.
+    bgg_rows = _read_bgg_rows(bgg_path)
+    popular_csv, popular_ids = _popular_bgg_csv(bgg_rows, top_n=5000)
+
     total_cost = 0.0
 
     for batch_idx, i in enumerate(range(0, len(items), batch_size)):
         batch = items[i:i + batch_size]
         batch_num = batch_idx + 1
-        # Per-batch BGG slice: top 5k most-rated games + every candidate id
-        # referenced by events in this batch. Keeps the prompt under context
-        # while still giving the agent a real catalog to verify against.
         force_ids: set[int] = set()
         for event in batch:
             for cand in event.get("candidates", []):
                 if isinstance(cand.get("bgg_id"), int):
                     force_ids.add(cand["bgg_id"])
-        bgg_csv = _bgg_csv_subset(bgg_path, popular_top_n=5000, force_ids=force_ids)
-        prompt = build_prompt(batch, bgg_csv)
+        extra_csv = _extras_bgg_csv(bgg_rows, force_ids=force_ids, popular_ids=popular_ids)
+        prompt = build_prompt(batch, popular_csv, extra_csv or None)
 
         if dry_run:
             print(f"--- batch {batch_num}/{n_batches} ({len(batch)} items) ---")
@@ -205,8 +227,15 @@ def run(
         if verbose and envelope is not None:
             md = _envelope_metadata(envelope)
             total_cost += md.get("cost", 0.0)
+            tokens_str = ""
+            if md:
+                # Format token counts as Kk for legibility.
+                ci = md["cache_create"] // 1000
+                cr = md["cache_read"] // 1000
+                ot = md["output_tokens"]
+                tokens_str = f", cache_create={ci}k cache_read={cr}k out={ot}"
             cost_str = f", ${md['cost']:.3f} (run total ${total_cost:.2f})" if md else ""
-            print(f" {elapsed:.1f}s → {n_id} matched, {n_null} null{cost_str}",
+            print(f" {elapsed:.1f}s → {n_id} matched, {n_null} null{tokens_str}{cost_str}",
                   file=sys.stderr, flush=True)
 
     return summary

@@ -415,25 +415,427 @@ WKS-learn-to-make-a-byzantine-chainmaille-bracelet-968fe8:
   note: 'high: Jewelry craft workshop, not a tabletop game.'
 BGM-dawn-patrol-wednesday-action-dawn-patrol-c17031:
   bgg_id: 4014
-  note: 'high: Dawn Patrol: Role Playing Game of WW I Air Combat is the classic aerial
-    combat game; description matches perfectly with missions over France in WWI.'
+  note: "high: The event is for 'Dawn Patrol: Role Playing Game of WW I Air Combat',
+    a historical miniatures/wargaming system. The top candidate matches perfectly
+    with score 100 and correct year 1982."
 WKS-learn-to-make-a-byzantine-chainmaille-bracelet-advanced-ladder-variant-b07662:
   bgg_id:
-  note: 'high: This is a crafting workshop (chainmaille jewelry making), not a tabletop
-    game.'
+  note: 'high: Workshop for chainmaille bracelet crafting is not a tabletop game and
+    has no BGG entry.'
 MHE-beginner-mini-painting-c751ce:
   bgg_id:
-  note: 'high: This is a hobby workshop about painting miniatures, not a tabletop
-    game itself.'
+  note: 'high: Miniature painting class is not a tabletop game; it is a craft/hobby
+    activity with no BGG entry.'
 RPG-downtown-militarized-zone-2-0-shadowrun-combat-grinder-shadowrun-88ccbc:
   bgg_id:
-  note: 'low: Shadowrun RPG organized play event/campaign module, not a published
-    tabletop board game with BGG entry.'
+  note: 'medium: RPG campaign event for Shadowrun; while Shadowrun is a tabletop RPG
+    system, it does not have a standalone BGG entry in the provided database.'
 RPG-broadway-5-scions-of-storytelling-dungeons-dragons-51d464:
   bgg_id:
-  note: 'low: D&D organized play campaign event, not a specific published board game
-    that maps to a BGG entry.'
+  note: 'high: RPG campaign event for Dungeons & Dragons 5e. The database contains
+    D&D board games but not the core RPG ruleset itself, and individual campaigns
+    do not have separate BGG entries.'
 RPG-where-the-lava-meets-the-sea-the-danger-disinterred-dungeons-dragons-125b9e:
   bgg_id:
-  note: 'low: D&D adventure/campaign module for organized play, not a standalone published
-    tabletop game with BGG entry.'
+  note: 'high: RPG campaign event using Dungeons & Dragons system; RPG campaigns are
+    not cataloged separately in BGG.'
+RPG-the-thing-in-the-well-mythcraft-rpg-c4f340:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG system; this appears to be a
+    custom RPG system without a BGG entry.'
+RPG-follow-the-moose-mythcraft-rpg-597011:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG system; custom RPG systems typically
+    do not have BGG entries.'
+RPG-the-music-of-erich-hans-mythcraft-rpg-26e1c2:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG; custom RPG system without BGG
+    entry.'
+RPG-what-lurks-beneath-mythcraft-rpg-67606c:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG system; custom systems lack
+    BGG entries.'
+RPG-the-rock-lobsters-mythcraft-rpg-6a8be6:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG system.'
+RPG-leadport-bastion-mythcraft-rpg-5e5dbf:
+  bgg_id:
+  note: 'high: RPG campaign event using MythCraft RPG system.'
+RPG-no-more-ale-no-more-ale-dungeons-dragons-73efd7:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system; specific campaigns
+    lack BGG entries.'
+RPG-operation-snatch-ttrpg-23efcb:
+  bgg_id:
+  note: 'high: RPG campaign event (G.I. Joe-inspired TTRPG one-shot); RPG campaigns
+    are not separately cataloged in BGG.'
+SPA-learn-to-crochet-e79d66:
+  bgg_id:
+  note: 'high: Crochet craft class is not a tabletop game and has no BGG entry.'
+RPG-sp-ders-cyberpunk-city-homebrew-6a8232:
+  bgg_id:
+  note: 'high: RPG campaign using homebrew cyberpunk system; custom RPGs lack BGG
+    entries.'
+RPG-tales-from-the-shadows-pt-1-night-messengers-dungeons-dragons-5aa622:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system.'
+ZED-trivia-in-the-morning-f24e38:
+  bgg_id:
+  note: 'high: Trivia event is not a tabletop game and has no BGG entry.'
+NMN-mordheim-80e5d6:
+  bgg_id: 3565
+  note: 'high: Mordheim is a Games Workshop miniatures wargame system with BGG entry
+    ID 3565, scoring 6.22. The game system matches perfectly with the event.'
+BGM-viking-traders-official-gen-con-launch-viking-traders-e3c20d:
+  bgg_id:
+  note: 'low: Viking Traders game is not found in the BGG database; while candidates
+    mention similar titles, none match exactly.'
+RPG-a-miner-problem-shadowdark-9ec221:
+  bgg_id:
+  note: 'medium: RPG campaign event using Shadowdark RPG system; this RPG system does
+    not have a clear BGG entry in the provided database.'
+SEM-gm-101-introduction-to-gamemastering-4fe3cd:
+  bgg_id:
+  note: 'high: Seminar on game mastering is not a tabletop game itself and has no
+    BGG entry.'
+NMN-brutl-tank-arena-rally-brutl-171d74:
+  bgg_id:
+  note: 'low: Brutl! Tank Arena game is not found in the BGG database; this appears
+    to be a custom or niche miniatures game without a BGG entry.'
+RPG-last-stand-at-the-forgotten-gates-one-shot-dungeons-dragons-3f3e7b:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system; specific campaigns
+    lack BGG entries.'
+RPG-the-girl-and-the-rat-household-0ded1e:
+  bgg_id:
+  note: "high: RPG campaign using custom 'Household' RPG system; custom systems lack
+    BGG entries."
+NMN-a-good-ol-fashioned-dungeon-crawl-recover-the-sucomber-stone-toxic-rat-s-dungeon-crawl-2b6433:
+  bgg_id:
+  note: "low: Toxic Rat's Dungeon Crawl is not found in the BGG database; appears
+    to be a custom miniatures game."
+ZED-gen-con-games-library-thursday-morning-pass-f3d767:
+  bgg_id:
+  note: 'high: Games library rental pass is not a tabletop game itself; it is a convention
+    service with no BGG entry.'
+RPG-escape-from-the-late-late-late-show-hero-system-c66fb7:
+  bgg_id:
+  note: 'high: RPG campaign event using Hero System; while Hero System exists, specific
+    campaigns are not cataloged in BGG.'
+RPG-the-sunken-vault-swords-of-the-serpentine-b0ee88:
+  bgg_id:
+  note: 'high: RPG campaign using Swords of the Serpentine system; specific RPG campaigns
+    lack BGG entries.'
+RPG-arcane-knights-the-master-is-dead-to-begin-with-hero-system-040eb2:
+  bgg_id:
+  note: 'high: RPG campaign event using Hero System.'
+RPG-isekai-shenanigans-bandits-beware-dungeons-dragons-cf8756:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system.'
+RPG-knights-of-the-dragon-1-celebration-dungeons-dragons-5d87a4:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system.'
+RPG-pictures-at-an-exhibition-level-1-the-gnome-dungeons-dragons-f19a0c:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system.'
+RPG-legacies-heart-of-decisions-dungeons-dragons-e1aa0f:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system (Legacies Campaign).'
+RPG-legacies-bleeding-hearts-dungeons-dragons-b3c6df:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system (Legacies Campaign).'
+RPG-legacies-sifting-the-sands-of-obscurity-dungeons-dragons-96ec8c:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system (Legacies Campaign).'
+RPG-legacies-a-stolen-daisho-dungeons-dragons-715087:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system (Legacies Campaign).'
+RPG-legacies-what-the-titans-leave-behind-dungeons-dragons-1980f2:
+  bgg_id:
+  note: 'high: RPG campaign event using Dungeons & Dragons system (Legacies Campaign).'
+HMN-general-glen-s-western-showdown-general-glen-s-showdown-47ee5a:
+  bgg_id:
+  note: "low: General Glen's Showdown historical miniatures game is not found in the
+    BGG database; appears to be a custom or niche system."
+LRP-colossal-undertaking-homebrew-022341:
+  bgg_id:
+  note: 'high: LARP event is not a tabletop board/war game and has no BGG entry.'
+BGM-gate-crasher-dc-brave-bold-bag-building-combat-game-83f5e4:
+  bgg_id: 464449
+  note: 'medium: DC Brave & Bold Bag Building Combat Game matches candidate BGG ID
+    464449 with score 100.0, though the game has a recent 2026 publication date with
+    limited BGG data.'
+RPG-sparks-305-did-we-find-the-bad-path-star-wars-the-roleplaying-game-weg-62f3b6:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG); specific
+    campaigns lack BGG entries.'
+RPG-sparks-308a-black-orchid-star-wars-the-roleplaying-game-weg-a719a1:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG).'
+RPG-sparks-306-the-great-nar-shaddaa-interplanetary-music-festival-star-wars-the-roleplaying-game-weg-30d73d:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG).'
+BGM-runesword-e95f48:
+  bgg_id:
+  note: 'low: Runesword game is not found as a main entry in the BGG database; while
+    RuneSword character cards exist, there is no identifiable core game entry.'
+RPG-sparks-52-distressing-games-on-nellios-star-wars-the-roleplaying-game-weg-feac27:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG).'
+RPG-sparks-169-to-infinity-and-beyond-star-wars-the-roleplaying-game-weg-a65d1d:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG).'
+RPG-sparks-49-the-iskallon-conundrum-star-wars-the-roleplaying-game-weg-6e16a1:
+  bgg_id:
+  note: 'high: RPG campaign event using Star Wars: The Roleplaying Game (WEG).'
+BGM-bridgerton-high-society-game-43276e:
+  bgg_id: 394286
+  note: 'high: Bridgerton: The High Society Game matches candidate BGG ID 394286 with
+    score 100.0. The game is from 2023 and is a licensed board game based on the Bridgerton
+    series.'
+SPA-diy-cottage-core-stationery-fd8c4c:
+  bgg_id:
+  note: 'high: DIY stationery craft activity is not a tabletop game and has no BGG
+    entry.'
+RPG-the-quest-for-s-t-i-c-k-smashing-tool-intended-for-crushing-and-killing-kobolds-ate-my-baby-1e3ba6:
+  bgg_id: 141830
+  note: 'high: Munchkin Kobolds Ate My Baby is the primary BGG entry for Kobolds Ate
+    My Baby games, matching the game system.'
+RPG-apotheosis-ch-1-the-crimson-gate-daggerheart-c72548:
+  bgg_id:
+  note: 'high: Custom campaign adventure for Daggerheart RPG system, not a published
+    board game with BGG entry.'
+WKS-sith-core-1b5133:
+  bgg_id:
+  note: 'high: Fitness/workout workshop, not a tabletop game.'
+RPG-sage-s-sabbatical-escape-from-the-arcanist-s-horn-dungeons-dragons-ca984c:
+  bgg_id:
+  note: 'high: Custom D&D campaign adventure, not a published tabletop game entry.'
+RPG-anno-1851-the-marked-one-s-choice-dishonored-0f7e88:
+  bgg_id:
+  note: 'high: Custom RPG campaign in Dishonored universe, not a published tabletop
+    game.'
+RPG-tower-of-sardior-dungeons-dragons-cbab5e:
+  bgg_id:
+  note: 'high: Custom D&D campaign adventure, not a published tabletop game.'
+RPG-yaujta-predators-part-4-the-temple-guardians-dungeons-dragons-8b3ebe:
+  bgg_id:
+  note: 'high: Custom D&D campaign session, not a published game entry.'
+RPG-the-romulans-did-what-star-trek-feea42:
+  bgg_id:
+  note: 'high: Custom Star Trek RPG campaign, not a published tabletop game.'
+RPG-the-darkness-without-monster-of-the-week-379bfc:
+  bgg_id:
+  note: 'high: Custom campaign for Monster of the Week RPG system, not a published
+    game entry.'
+RPG-the-weight-of-winter-vaesen-9a6155:
+  bgg_id:
+  note: 'high: Custom campaign for Vaesen RPG system, not a published tabletop game.'
+RPG-dresden-files-neutral-grounds-dungeons-dragons-73672a:
+  bgg_id:
+  note: 'high: Custom D&D campaign in Dresden Files universe, not a published game.'
+RPG-night-vale-presents-high-school-reunion-dungeons-dragons-a8f357:
+  bgg_id:
+  note: 'high: Custom D&D campaign in Night Vale universe, not a published tabletop
+    game.'
+BGM-awkward-guest-d77ed0:
+  bgg_id: 203415
+  note: 'high: Matches Awkward Guests: The Walton Case, a deduction game where each
+    playthrough recreates a murder mystery differently.'
+RPG-aunti-agay-s-pinebox-texas-middle-school-4ec81d:
+  bgg_id:
+  note: 'high: Custom campaign for Pinebox Texas Middle School RPG system, not a published
+    game entry.'
+RPG-the-devil-s-justice-heroes-unlimited-b56cf1:
+  bgg_id:
+  note: 'high: Custom Heroes Unlimited RPG campaign, not a published tabletop game.'
+RPG-fall-of-catopia-dungeons-dragons-87082d:
+  bgg_id:
+  note: 'high: Custom D&D campaign adventure, not a published game entry.'
+BGM-hexapod-71d16e:
+  bgg_id: 313794
+  note: 'high: Hexapod: The Curious Pastime of Entomology is a 1v1 tactical board
+    game with hexagonal layout and nectar point victory condition.'
+RPG-bequeathed-13-omens-7e1110:
+  bgg_id:
+  note: 'high: Custom campaign for 13 Omens RPG system, not a published tabletop game.'
+RPG-beast-feast-daggerheart-7e8bc4:
+  bgg_id:
+  note: 'high: Custom Daggerheart RPG campaign, not a published board game.'
+RPG-goblin-attack-dungeons-dragons-d4a69b:
+  bgg_id:
+  note: 'high: Custom D&D campaign session, not a published tabletop game entry.'
+RPG-magic-door-dungeons-dragons-aff645:
+  bgg_id:
+  note: 'high: Custom D&D campaign adventure, not a published game entry.'
+SPA-paracording-single-d20-dragon-scale-bracelet-bad2bd:
+  bgg_id:
+  note: 'high: Crafting workshop activity, not a tabletop game.'
+RPG-mysterierous-mages-mansion-dungeons-dragons-4677a9:
+  bgg_id:
+  note: 'high: Custom D&D campaign session, not a published game entry.'
+EGM-artemis-training-war-artemis-31c993:
+  bgg_id:
+  note: 'high: Electronic spaceship simulator activity, not a traditional tabletop
+    game.'
+RPG-not-your-momma-s-majokko-glitterhearts-405631:
+  bgg_id:
+  note: 'high: Custom Glitterhearts RPG campaign, not a published board game.'
+EGM-artemis-training-alien-invasion-artemis-5fa1b9:
+  bgg_id:
+  note: 'high: Electronic spaceship simulator activity, not a traditional tabletop
+    game.'
+RPG-b2-keep-on-the-borderlands-dungeons-dragons-9ca168:
+  bgg_id:
+  note: 'high: Classic D&D module being run as campaign session, not a board game
+    entry.'
+MHE-rot-revival-mastering-undead-skin-d2ca8d:
+  bgg_id:
+  note: 'high: Miniature painting hobby workshop, not a tabletop game.'
+RPG-it-lies-within-saphros-temple-proto-e388e9:
+  bgg_id:
+  note: 'high: Custom Proto RPG campaign, not a published tabletop game.'
+EGM-artemis-cosmos-training-siege-artemis-439bbc:
+  bgg_id:
+  note: 'high: Electronic spaceship simulator activity, not a traditional tabletop
+    game.'
+RPG-the-wizarding-world-of-harry-potter-5-years-after-voldemort-dungeons-dragons-e07a6e:
+  bgg_id:
+  note: 'high: Custom D&D campaign in Harry Potter universe, not a published game.'
+RPG-the-wizarding-world-of-harry-potter-6-years-after-voldemort-chapter-2-dungeons-dragons-0a8ec9:
+  bgg_id:
+  note: 'high: Custom D&D campaign in Harry Potter universe, not a published tabletop
+    game.'
+RPG-the-wizarding-world-of-harry-potter-8-years-after-voldemort-chapter-4-dungeons-dragons-72f0f8:
+  bgg_id:
+  note: 'high: Custom D&D campaign in Harry Potter universe, not a published game
+    entry.'
+RPG-the-wizarding-world-of-harry-potter-5-6-7-years-after-voldemort-dungeons-dragons-e559ec:
+  bgg_id:
+  note: 'high: Custom D&D campaign series, not a published tabletop game.'
+RPG-lob-113-wild-horses-earthdawn-fd7e69:
+  bgg_id:
+  note: 'high: Custom Earthdawn living campaign adventure, not a published game entry.'
+ZED-first-exposure-playtest-a-game-in-development-898eaf:
+  bgg_id:
+  note: 'high: Playtest hall event category, not a specific published tabletop game.'
+EGM-artemis-uss-gen-con-artemis-0800d6:
+  bgg_id:
+  note: 'high: Electronic spaceship simulator activity, not a traditional tabletop
+    game.'
+EGM-artemis-uss-card-artemis-85e35a:
+  bgg_id:
+  note: 'high: Electronic spaceship simulator activity, not a traditional tabletop
+    game.'
+RPG-once-more-into-the-frey-dungeons-dragons-8ebb7f:
+  bgg_id:
+  note: 'high: Custom D&D campaign session, not a published game entry.'
+BGM-get-a-hint-1a493b:
+  bgg_id:
+  note: 'medium: Party game with clue-giving mechanics, no clear BGG match from candidates
+    provided.'
+RPG-misadventures-in-the-misty-isles-expert-adventure-advanced-dungeons-dragons-ef65ff:
+  bgg_id:
+  note: 'high: Custom Advanced D&D campaign session, not a published game entry.'
+RPG-on-the-run-1-middle-earth-roleplaying-72504b:
+  bgg_id:
+  note: 'high: Custom Middle-earth Roleplaying campaign, not a published tabletop
+    game.'
+RPG-big-trouble-in-little-stairside-household-7fb1ae:
+  bgg_id:
+  note: 'high: Custom Household RPG campaign, not a published board game.'
+BGM-assasin-s-creed-animus-the-board-game-7e182f:
+  bgg_id:
+  note: 'medium: Video game universe tie-in game, no clear BGG entry found in provided
+    data.'
+RPG-sword-and-spade-doomsong-7878ca:
+  bgg_id:
+  note: 'high: Custom Doomsong RPG campaign, not a published tabletop game.'
+BGM-gempire-4ef81b:
+  bgg_id: 320030
+  note: "high: Gempire: Zarmund's Demands is a strategic city-building game with secret
+    planning mechanics and variable victory conditions."
+RPG-build-a-runner-workshop-shadowrun-52e3a5:
+  bgg_id:
+  note: 'high: Character-building workshop activity for Shadowrun living campaign,
+    not a game itself.'
+RPG-first-taste-shadowrun-6be7e9:
+  bgg_id:
+  note: 'high: Custom Shadowrun campaign mission, not a published tabletop game entry.'
+RPG-srm-2083-19-the-hollow-feast-shadowrun-41b86c:
+  bgg_id:
+  note: 'high: Shadowrun Missions campaign session, not a published board game entry.'
+RPG-cmp-2083-13-general-s-daughter-shadowrun-845b74:
+  bgg_id:
+  note: 'high: Shadowrun campaign module/session, not a published tabletop game entry.'
+RPG-srm-2083-17-haute-blooded-shadowrun-45bc7d:
+  bgg_id:
+  note: 'low: This is a Shadowrun RPG organized play event, not a board game; Shadowrun
+    is an RPG system without a clear standalone board game entry in the popular BGG
+    list.'
+RPG-srm-2083-18-some-kind-of-voodoo-shadowrun-9da6b8:
+  bgg_id:
+  note: 'low: This is a Shadowrun RPG organized play event, not a board game; the
+    candidates are either Shadowrun products or unrelated games without a clear match
+    to a standalone board game.'
+RPG-srm-2083-20-the-fallacy-of-plans-shadowrun-148a18:
+  bgg_id:
+  note: 'low: This is a Shadowrun RPG organized play event, not a board game; while
+    Shadowrun products exist on BGG, these narrative RPG scenarios do not map to a
+    specific board game entry.'
+RPG-cmp-2083-17-it-takes-a-village-shadowrun-f59d86:
+  bgg_id:
+  note: 'high: Shadowrun RPG event; no matching board game entry found in BGG database.
+    Candidates provided are either invalid entries or Shadowrun card game expansions,
+    not the core system.'
+RPG-cmp-2083-21-fortune-knocks-once-shadowrun-408fd8:
+  bgg_id:
+  note: 'high: Shadowrun RPG event; no matching board game entry found in BGG database.
+    Candidates are mostly placeholder entries with no valid data.'
+RPG-srm-2083-21-where-the-sun-don-t-shine-shadowrun-d4e5f3:
+  bgg_id:
+  note: 'high: Shadowrun RPG event; no matching board game entry found in BGG database.
+    Shadowrun is an RPG system, not a tabletop board game with a standard BGG listing.'
+SPA-decoding-downtown-indy-walking-tour-cfe505:
+  bgg_id:
+  note: 'high: This is a real-world walking tour of historic downtown Indianapolis,
+    not a tabletop board game event. Candidates are false positives from keyword matching.'
+BGM-arcs-expansions-arcs-conflict-and-collapse-in-the-reach-703cfd:
+  bgg_id: 359871
+  note: "high: Game system explicitly names 'Arcs: Conflict and Collapse in the Reach';
+    description of trick-taking, ship placement, spacefaring factions, and empire
+    collapse matches Arcs (2024) perfectly."
+MHE-tiles-to-tabletop-mdf-dungeons-ruins-230773:
+  bgg_id:
+  note: "high: This is a craft workshop for building and painting MDF terrain tiles,
+    not a tabletop board game event. It's a supplemental activity/seminar rather than
+    a game with a BGG entry."
+BGM-dawn-patrol-the-last-flight-of-werner-voss-dawn-patrol-28a26e:
+  bgg_id: 4014
+  note: "high: Exact match for game system 'Dawn Patrol' - BGG entry is the official
+    Dawn Patrol RPG about WW1 air combat, directly matching the event's description."
+RPG-a-crime-of-passion-earthdawn-c2d5e0:
+  bgg_id:
+  note: 'high: This is an Earthdawn RPG session event. Earthdawn is a tabletop RPG
+    system without a dedicated BGG entry; the fuzzy-matched candidates are unrelated
+    generic words, not Earthdawn materials.'
+RPG-order-of-the-karra-pokerole-12ad27:
+  bgg_id:
+  note: 'high: This is a Pokerole RPG session event. Pokerole is a tabletop RPG system
+    without a dedicated BGG entry; the fuzzy-matched candidates do not match the actual
+    game system or event.'
+ZED-puffing-billy-ribbon-2af185:
+  bgg_id: 228591
+  note: "medium: Event title 'Puffing Billy Ribbon' explicitly names 'Puffing Billy',
+    matching 'Snowdonia: Puffing Billy' with 79% fuzzy score. Though an expansion,
+    the event title clearly identifies this game."
+RPG-cahokia-falling-coyote-and-crow-96c309:
+  bgg_id: 414522
+  note: "medium: Game system is 'Coyote and Crow'. 'Primacy: A Coyote & Crow Card
+    Game' is the only BGG entry explicitly containing both keywords, scoring 85% on
+    fuzzy matching. Best available match for the specified game system."
+TCG-riftbound-learn-to-play-riftbound-4cf222:
+  bgg_id: 436560
+  note: "high: Perfect match: game system 'Riftbound' exactly matches 'Riftbound:
+    The League of Legends Trading Card Game' (2025) with 100% fuzzy score. This is
+    clearly the TCG system referenced in the event."

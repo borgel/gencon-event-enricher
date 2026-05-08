@@ -100,3 +100,57 @@ export function buildPredicate(state, savedKeys) {
 function matchLocation(g) {
   return g.sessions[0]?.location ?? '';
 }
+
+// ---- URL hash sync ----
+//
+// Encoded form is `key=value&key=value`. Sets are comma-separated. Empty
+// values are omitted to keep URLs short.
+
+const SET_KEYS = ['days', 'types', 'durationBands', 'locations'];
+
+export function stateToHash(state) {
+  const parts = [];
+  if (state.search) parts.push(`q=${encodeURIComponent(state.search)}`);
+  for (const k of SET_KEYS) {
+    if (state[k].size) parts.push(`${k}=${[...state[k]].join(',')}`);
+  }
+  if (state.hourMin > 0)  parts.push(`hMin=${state.hourMin}`);
+  if (state.hourMax < 24) parts.push(`hMax=${state.hourMax}`);
+  if (state.party > 0)    parts.push(`party=${state.party}`);
+  if (state.costBand)     parts.push(`cost=${state.costBand}`);
+  if (state.age)          parts.push(`age=${encodeURIComponent(state.age)}`);
+  if (state.experience)   parts.push(`exp=${encodeURIComponent(state.experience)}`);
+  if (!state.ticketsOnly) parts.push(`tix=0`);    // default is true → omit when on
+  if (state.tournament !== 'either') parts.push(`tourn=${state.tournament}`);
+  if (state.bggMin > 0)   parts.push(`bgg=${state.bggMin}`);
+  if (state.hasBggOnly)   parts.push(`bggOnly=1`);
+  if (state.savedOnly)    parts.push(`saved=1`);
+  return parts.join('&');
+}
+
+export function hashToState(hash) {
+  const s = defaultState();
+  if (!hash) return s;
+  const trimmed = hash.startsWith('#') ? hash.slice(1) : hash;
+  for (const pair of trimmed.split('&').filter(Boolean)) {
+    const [k, v] = pair.split('=');
+    const dv = decodeURIComponent(v ?? '');
+    switch (k) {
+      case 'q': s.search = dv; break;
+      case 'days': case 'types': case 'durationBands': case 'locations':
+        s[k] = new Set(dv.split(',').filter(Boolean)); break;
+      case 'hMin': s.hourMin = +dv; break;
+      case 'hMax': s.hourMax = +dv; break;
+      case 'party': s.party = +dv; break;
+      case 'cost': s.costBand = dv; break;
+      case 'age': s.age = dv; break;
+      case 'exp': s.experience = dv; break;
+      case 'tix': s.ticketsOnly = dv !== '0'; break;
+      case 'tourn': s.tournament = dv; break;
+      case 'bgg': s.bggMin = +dv; break;
+      case 'bggOnly': s.hasBggOnly = dv === '1'; break;
+      case 'saved': s.savedOnly = dv === '1'; break;
+    }
+  }
+  return s;
+}

@@ -121,6 +121,7 @@ def _build_default_invoker(
     *,
     base_url: Optional[str] = None,
     strict_schema: bool = True,
+    max_tokens: int = 16384,
 ):
     if backend == "claude":
         m = model or DEFAULT_CLAUDE_MODEL
@@ -131,7 +132,10 @@ def _build_default_invoker(
     if backend == "openai":
         m = model or DEFAULT_OPENAI_MODEL
         u = base_url or DEFAULT_OPENAI_BASE_URL
-        return lambda p: invoke_openai(p, model=m, base_url=u, strict_schema=strict_schema)
+        return lambda p: invoke_openai(
+            p, model=m, base_url=u,
+            strict_schema=strict_schema, max_tokens=max_tokens,
+        )
     raise ValueError(
         f"unknown backend: {backend!r} (expected 'claude', 'ollama', or 'openai')"
     )
@@ -171,6 +175,7 @@ def run(
     model: Optional[str] = None,
     base_url: Optional[str] = None,
     strict_schema: bool = True,
+    max_tokens: int = 16384,
     batch_size: Optional[int] = None,
     popular_top_n: Optional[int] = None,
     limit: Optional[int] = None,
@@ -181,7 +186,8 @@ def run(
     # selected backend. Tests pass their own invoker, which is unaffected.
     if invoker is None:
         invoker = _build_default_invoker(
-            backend, model, base_url=base_url, strict_schema=strict_schema,
+            backend, model, base_url=base_url,
+            strict_schema=strict_schema, max_tokens=max_tokens,
         )
     effective_model = model or (
         DEFAULT_OPENAI_MODEL if backend == "openai" else
@@ -352,6 +358,11 @@ def main(argv: list[str] | None = None) -> int:
                               "json_object instead of json_schema. use this "
                               "if your server doesn't support json_schema "
                               "(e.g. some older versions of mlx-lm)."))
+    parser.add_argument("--max-tokens", type=int, default=16384,
+                        help=("max output tokens per request (default 16384). "
+                              "raise if you see truncated output, especially "
+                              "on reasoning-style models that emit a lot before "
+                              "the JSON. only used by --backend openai."))
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="print per-batch progress + cost as the run proceeds")
     ns = parser.parse_args(argv)
@@ -371,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         model=ns.model,
         base_url=ns.base_url,
         strict_schema=not ns.no_strict_schema,
+        max_tokens=ns.max_tokens,
         batch_size=ns.batch_size,
         popular_top_n=ns.popular_bgg_size,
         limit=ns.limit,

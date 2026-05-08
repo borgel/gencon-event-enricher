@@ -128,8 +128,23 @@ def invoke_openai(
     if not choices:
         raise RuntimeError(f"server returned no choices: {data}")
 
-    content = choices[0].get("message", {}).get("content", "")
+    msg = choices[0].get("message", {}) or {}
+    content = (msg.get("content") or "").strip()
+    finish_reason = choices[0].get("finish_reason")
     usage = data.get("usage", {}) or {}
+
+    if not content:
+        # Common cause on reasoning-capable models (qwen3, deepseek-r1):
+        # the model spent all max_tokens on thinking before emitting JSON.
+        # Surface the full response so the failure mode is diagnosable.
+        raise RuntimeError(
+            f"server returned empty content. finish_reason={finish_reason!r}, "
+            f"output_tokens={usage.get('completion_tokens', 0)}/{max_tokens}. "
+            f"For reasoning models (qwen3, deepseek-r1, etc.), thinking tokens "
+            f"may have consumed the budget before any JSON was produced. "
+            f"Try a non-thinking model (qwen2.5:14b, llama3.1:8b) or raise "
+            f"max_tokens. Full message: {msg!r}"
+        )
 
     return json.dumps({
         "result": content,

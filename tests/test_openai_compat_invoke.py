@@ -145,6 +145,19 @@ def test_no_choices_raises():
             invoke_openai("ignored")
 
 
+def test_empty_content_raises_diagnostic():
+    """Empty message.content (e.g., from reasoning models that ate max_tokens) is
+    surfaced with a clear diagnostic, not a confusing downstream parse error."""
+    payload = {
+        "choices": [{"message": {"role": "assistant", "content": ""},
+                     "finish_reason": "length"}],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 16384, "total_tokens": 16484},
+    }
+    with patch("pipeline.openai_compat_invoke.urlopen", return_value=_fake_response(payload)):
+        with pytest.raises(RuntimeError, match=r"empty content"):
+            invoke_openai("ignored")
+
+
 def test_error_field_in_response():
     payload = {"error": "rate limit"}
     with patch("pipeline.openai_compat_invoke.urlopen", return_value=_fake_response(payload)):

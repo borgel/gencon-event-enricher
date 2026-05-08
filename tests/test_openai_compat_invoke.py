@@ -146,8 +146,7 @@ def test_no_choices_raises():
 
 
 def test_empty_content_raises_diagnostic():
-    """Empty message.content (e.g., from reasoning models that ate max_tokens) is
-    surfaced with a clear diagnostic, not a confusing downstream parse error."""
+    """Empty content with no reasoning fallback raises a clear diagnostic."""
     payload = {
         "choices": [{"message": {"role": "assistant", "content": ""},
                      "finish_reason": "length"}],
@@ -156,6 +155,44 @@ def test_empty_content_raises_diagnostic():
     with patch("pipeline.openai_compat_invoke.urlopen", return_value=_fake_response(payload)):
         with pytest.raises(RuntimeError, match=r"empty content"):
             invoke_openai("ignored")
+
+
+def test_falls_back_to_reasoning_content():
+    """Reasoning-style models (qwen3, deepseek-r1) route JSON into
+    reasoning_content while content stays empty — we should accept that."""
+    inner = {"matches": [{"key": "K1", "bgg_id": None, "confidence": "high",
+                          "reasoning": "Event is an RPG, excluded from BGG."}]}
+    payload = {
+        "choices": [{
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "reasoning_content": json.dumps(inner),
+            },
+            "finish_reason": "stop",
+        }],
+        "usage": {"prompt_tokens": 100, "completion_tokens": 200},
+    }
+    with patch("pipeline.openai_compat_invoke.urlopen", return_value=_fake_response(payload)):
+        envelope = invoke_openai("ignored")
+    parsed = json.loads(envelope)
+    assert "matches" in parsed["result"]
+
+
+def test_falls_back_to_reasoning_field():
+    """Some servers use the shorter key 'reasoning' instead of 'reasoning_content'."""
+    inner = {"matches": []}
+    payload = {
+        "choices": [{
+            "message": {"role": "assistant", "content": "", "reasoning": json.dumps(inner)},
+            "finish_reason": "stop",
+        }],
+        "usage": {},
+    }
+    with patch("pipeline.openai_compat_invoke.urlopen", return_value=_fake_response(payload)):
+        envelope = invoke_openai("ignored")
+    parsed = json.loads(envelope)
+    assert json.loads(parsed["result"]) == inner
 
 
 def test_error_field_in_response():

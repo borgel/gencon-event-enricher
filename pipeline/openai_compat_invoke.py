@@ -133,17 +133,27 @@ def invoke_openai(
     finish_reason = choices[0].get("finish_reason")
     usage = data.get("usage", {}) or {}
 
+    # Reasoning-style models (qwen3, qwen3.5, deepseek-r1, etc.) sometimes
+    # route the structured answer into `reasoning_content` (or `reasoning`)
+    # and leave `content` empty. Treat those as equivalent for our purposes.
     if not content:
-        # Common cause on reasoning-capable models (qwen3, deepseek-r1):
-        # the model spent all max_tokens on thinking before emitting JSON.
-        # Surface the full response so the failure mode is diagnosable.
+        for fallback_key in ("reasoning_content", "reasoning"):
+            fallback = (msg.get(fallback_key) or "").strip()
+            if fallback:
+                content = fallback
+                break
+
+    if not content:
+        # Empty even after reasoning fallback — likely the model used all
+        # max_tokens before emitting anything we can parse.
         raise RuntimeError(
-            f"server returned empty content. finish_reason={finish_reason!r}, "
+            f"server returned empty content (and no reasoning_content). "
+            f"finish_reason={finish_reason!r}, "
             f"output_tokens={usage.get('completion_tokens', 0)}/{max_tokens}. "
-            f"For reasoning models (qwen3, deepseek-r1, etc.), thinking tokens "
-            f"may have consumed the budget before any JSON was produced. "
-            f"Try a non-thinking model (qwen2.5:14b, llama3.1:8b) or raise "
-            f"max_tokens. Full message: {msg!r}"
+            f"For reasoning models, the budget may have been consumed before "
+            f"any JSON was produced. Try a non-reasoning model "
+            f"(qwen2.5:14b, llama3.1:8b) or raise max_tokens. "
+            f"Full message: {msg!r}"
         )
 
     return json.dumps({

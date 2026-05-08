@@ -1,0 +1,117 @@
+// Renders a virtualized list of event-group rows into #results-list.
+// Public API: createTableView({ container, rowHeightPx, onRowClick }).
+// Call setRows(groups) to update the data; setSelectedKey(key) to highlight.
+
+const OVERSCAN = 8;
+
+export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
+  let rows = [];
+  let selectedKey = null;
+
+  // DOM: spacer (sets total height) + content layer (positions absolute rows).
+  const spacer = document.createElement('div');
+  spacer.style.position = 'relative';
+  spacer.style.height = '0px';
+  container.innerHTML = '';
+  container.appendChild(spacer);
+  container.style.position = 'relative';
+
+  const visible = new Map(); // index -> DOM row
+
+  function render() {
+    const scrollTop = container.scrollTop;
+    const viewport = container.clientHeight;
+    const startIdx = Math.max(0, Math.floor(scrollTop / rowHeightPx) - OVERSCAN);
+    const endIdx = Math.min(rows.length, Math.ceil((scrollTop + viewport) / rowHeightPx) + OVERSCAN);
+
+    // Remove rows outside [startIdx, endIdx).
+    for (const [idx, el] of [...visible]) {
+      if (idx < startIdx || idx >= endIdx) {
+        el.remove();
+        visible.delete(idx);
+      }
+    }
+    // Add rows inside the window.
+    for (let i = startIdx; i < endIdx; i++) {
+      if (visible.has(i)) continue;
+      const el = makeRow(rows[i]);
+      el.style.position = 'absolute';
+      el.style.top = (i * rowHeightPx) + 'px';
+      el.style.left = '0'; el.style.right = '0';
+      if (rows[i].key === selectedKey) el.classList.add('selected');
+      el.addEventListener('click', () => onRowClick && onRowClick(rows[i].key));
+      spacer.appendChild(el);
+      visible.set(i, el);
+    }
+  }
+
+  container.addEventListener('scroll', render, { passive: true });
+  window.addEventListener('resize', render);
+
+  return {
+    setRows(newRows) {
+      rows = newRows;
+      spacer.style.height = (newRows.length * rowHeightPx) + 'px';
+      // Hard reset visible map (group identities may differ even if indices line up).
+      for (const el of visible.values()) el.remove();
+      visible.clear();
+      container.scrollTop = 0;
+      render();
+    },
+    setSelectedKey(key) {
+      selectedKey = key;
+      for (const [idx, el] of visible) {
+        el.classList.toggle('selected', rows[idx]?.key === key);
+      }
+    },
+  };
+}
+
+function makeRow(g) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <span class="when">${formatWhen(g)}</span>
+    <span class="title">${escape(g.title)} <span class="meta">${formatMeta(g)}</span></span>
+    <span class="meta">${escape(g.event_type)}</span>
+    <span class="tix ${ticketsClass(g)}">${formatTix(g)}</span>
+    <span class="bgg ${g.bgg ? '' : 'none'}">${formatBgg(g)}</span>
+  `;
+  return row;
+}
+
+function formatWhen(g) {
+  const s = g.sessions[0];
+  if (!s) return '';
+  const d = new Date(s.start);
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const h = d.getHours();
+  const ampm = h < 12 ? 'a' : 'p';
+  const h12 = ((h + 11) % 12) + 1;
+  return `${day} ${h12}${ampm}`;
+}
+
+function formatMeta(g) {
+  const dur = g.duration_minutes ? `${(g.duration_minutes / 60).toFixed(g.duration_minutes % 60 ? 1 : 0)}h` : '';
+  const sessions = g.sessions.length > 1 ? ` · ${g.sessions.length} sessions` : '';
+  return `· ${dur}${sessions}`;
+}
+
+function ticketsClass(g) {
+  const total = g.sessions.reduce((sum, s) => sum + (s.tickets_available ?? 0), 0);
+  return total > 0 ? 'have' : 'gone';
+}
+function formatTix(g) {
+  const total = g.sessions.reduce((sum, s) => sum + (s.tickets_available ?? 0), 0);
+  return total > 0 ? String(total) : '0';
+}
+function formatBgg(g) {
+  if (!g.bgg || g.bgg.bayesaverage == null) return '—';
+  return `★ ${g.bgg.bayesaverage.toFixed(2)}`;
+}
+
+function escape(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}

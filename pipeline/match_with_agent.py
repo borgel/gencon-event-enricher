@@ -94,7 +94,7 @@ def _extras_bgg_csv(
     return "\n".join(out)
 
 
-DEFAULT_BACKEND = "ollama"
+DEFAULT_BACKEND = "openai"
 DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5"
 # Per-backend model defaults live in their invoker modules.
 

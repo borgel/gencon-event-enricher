@@ -7,6 +7,14 @@
 #   ./run.sh --with-agent --dry-run       preview agent prompts, no API calls
 #   ./run.sh --help                       this message
 #
+# By default --with-agent uses an OpenAI-compatible local server at
+# http://localhost:1234/v1 (LM Studio's default port) with model
+# 'qwen/qwen3.5-9b'. Override via env vars or flags:
+#   OPENAI_BASE_URL=http://localhost:8080/v1 ./run.sh --with-agent       # mlx-lm
+#   OPENAI_MODEL=mlx-community/qwen2.5-14b-instruct ./run.sh --with-agent
+#   ./run.sh --with-agent --backend ollama --model qwen2.5:14b           # use Ollama
+#   ./run.sh --with-agent --backend claude --model claude-haiku-4-5      # use Claude API
+#
 # Anything after --with-agent is forwarded verbatim to match_with_agent.py.
 set -euo pipefail
 
@@ -29,6 +37,16 @@ if (( with_agent )); then
     echo "==> [1/3] Building events.json (deterministic match)"
     uv run python -m pipeline.build
     echo "==> [2/3] Running agent matcher"
+    # Pre-flight: warn if the default openai server isn't reachable.
+    base_url="${OPENAI_BASE_URL:-http://localhost:1234/v1}"
+    if [[ ! " $* " =~ " --backend " ]] && ! curl -sf "${base_url}/models" >/dev/null 2>&1; then
+        echo "  warning: ${base_url}/models is unreachable." >&2
+        echo "  Make sure your local LLM server is running." >&2
+        echo "  - LM Studio: open the app, load a model, enable the local server." >&2
+        echo "  - mlx-lm:    \`mlx_lm.server --model <name>\`" >&2
+        echo "  Or pass --backend ollama / --backend claude to bypass." >&2
+        echo "" >&2
+    fi
     uv run python -m pipeline.match_with_agent "$@"
     echo "==> [3/3] Rebuilding to integrate new agent mappings"
     uv run python -m pipeline.build

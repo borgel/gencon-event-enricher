@@ -24,13 +24,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-# Default to mlx-lm's port because the project policy is "scriptable/headless
-# where possible" — mlx-lm runs as a CLI server, LM Studio needs the GUI.
+# Defaults match the user's working LM Studio setup. Override via the
+# OPENAI_BASE_URL / OPENAI_MODEL env vars or --base-url / --model flags
+# to point at a different server (mlx-lm on :8080, OpenAI cloud, etc.).
 DEFAULT_OPENAI_BASE_URL = os.environ.get(
-    "OPENAI_BASE_URL", "http://localhost:8080/v1"
+    "OPENAI_BASE_URL", "http://localhost:1234/v1"
 )
 DEFAULT_OPENAI_MODEL = os.environ.get(
-    "OPENAI_MODEL", "mlx-community/Qwen2.5-14B-Instruct-4bit"
+    "OPENAI_MODEL", "qwen/qwen3.5-9b"
 )
 
 

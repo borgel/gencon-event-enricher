@@ -72,77 +72,80 @@ The runner is resumable — keys already present in `mappings.yaml` or `mappings
 
 Useful flags:
 
-- `--backend ollama|openai|claude` — which matcher to use (default: `ollama`).
+- `--backend openai|ollama|claude` — which matcher to use (default: `openai`).
 - `--model NAME` — override the per-backend default model.
+- `--base-url URL` — for `--backend openai`, where to find the server.
+- `--max-tokens N` — output budget per request (default 16384). Raise on reasoning models.
+- `--no-strict-schema` — for `--backend openai`, fall back to `json_object` if the server rejects `json_schema`.
 - `--dry-run` — print the prompt(s) without invoking the model.
 - `--limit N` — cap groups processed in this run.
-- `--batch-size N` — events per request (default 200 for ollama, 50 for claude).
-- `--popular-bgg-size N` — how many of the most-rated BGG entries to include in the prompt as a general catalog. Defaults: 500 (ollama), 5000 (claude). Set to 0 to omit entirely. Per-batch fuzzy candidates are always included regardless.
+- `--batch-size N` — events per request (default 200 for openai/ollama, 50 for claude).
+- `--popular-bgg-size N` — how many of the most-rated BGG entries to include in the prompt as a general catalog. Defaults: 500 (openai/ollama), 5000 (claude). Set to 0 to omit entirely. Per-batch fuzzy candidates are always included regardless.
 - `-v` / `--verbose` — per-batch progress with token + cost stats.
 
-### Backend: Ollama (default, local, free)
+### Backend: OpenAI-compatible server (default — local MLX, LM Studio, etc.)
 
-Runs against a local model server. Setup once:
+`--backend openai` POSTs to `<base_url>/chat/completions` with a JSON-schema-constrained request. Works against any server implementing the OpenAI Chat Completions API. On Apple Silicon, **MLX-accelerated serving is 1.5–2.5× faster than llama.cpp** for the same model.
 
-```bash
-brew install ollama          # macOS
-# (or download from https://ollama.com)
+**Defaults** (override via env vars or flags):
+- `base_url`: `http://localhost:1234/v1` (LM Studio's port)
+- `model`: `qwen/qwen3.5-9b`
+- `OPENAI_BASE_URL` / `OPENAI_MODEL` env vars override the defaults
+- `--base-url` / `--model` CLI flags override env vars
 
-# In one shell, start the server (it auto-starts as a service after install):
-ollama serve
-
-# In another, pull a model. Recommended:
-ollama pull qwen2.5:14b      # default; ~9 GB, good at JSON/structured output
-# Alternatives:
-ollama pull llama3.1:8b      # ~5 GB, faster, slightly less precise
-ollama pull qwen2.5:32b      # ~20 GB, higher quality if you have RAM/GPU
-
-# Verify:
-ollama run qwen2.5:14b "say hi briefly"
-
-# Then run the pipeline:
-./run.sh --with-agent
-```
-
-The runner POSTs to `http://localhost:11434/api/generate` with `format: json` and `options.num_ctx: 65536` (the BGG popular-5k slice plus events comes to ~50k tokens). No API key. No cost.
-
-### Backend: OpenAI-compatible server (local MLX or any OpenAI-API server)
-
-`--backend openai` POSTs to `<base_url>/chat/completions` with a JSON-output request. Works against any server implementing the OpenAI Chat Completions API. On Apple Silicon, **MLX-accelerated serving is 1.5–2.5× faster than llama.cpp** for the same model, so this is the fastest local option.
-
-#### Recommended (headless): mlx-lm
-
-```bash
-# one-time
-pip install mlx-lm                                                       # or `uv tool install mlx-lm`
-
-# in one shell, run the server (defaults to :8080)
-mlx_lm.server --model mlx-community/Qwen2.5-14B-Instruct-4bit
-
-# in another, run the matcher (default --base-url is mlx-lm's :8080/v1)
-./run.sh --with-agent --backend openai --verbose
-```
-
-The server stays up across runs — model is loaded once, requests are stateless. To use a different model, restart the server with a different `--model` flag (browse `mlx-community` on Hugging Face).
-
-#### Alternative: LM Studio
-
-If you prefer a GUI for model browsing:
+#### LM Studio (GUI; the default config)
 
 1. Download from <https://lmstudio.ai>.
-2. In the Discover tab, filter for "MLX" and download an MLX-format model (e.g. `mlx-community/Qwen2.5-14B-Instruct-4bit`).
-3. In the Developer / Local Server tab, load that model and start the server.
-4. Run the matcher pointing at LM Studio's port:
+2. In the Discover tab, search for an MLX model (e.g. `qwen3.5-9b`, `qwen2.5-14b-instruct-mlx`). Look for the "MLX" tag.
+3. In the Developer / Local Server tab, **load the model** and **start the server** (default port 1234).
+4. Run the matcher:
 
 ```bash
-./run.sh --with-agent --backend openai --base-url http://localhost:1234/v1 --model qwen2.5-14b-instruct --verbose
+./run.sh --with-agent --verbose
 ```
 
-Both paths produce the same API surface for our pipeline. mlx-lm wins on scriptability (it's a process you can manage with launchd/systemd/supervisord); LM Studio wins on ergonomics if you're trying many models.
+That's it. `./run.sh` will pre-flight a check that the server is reachable and warn you helpfully if it's not.
+
+To verify the model id LM Studio is exposing:
+```bash
+curl http://localhost:1234/v1/models | python3 -m json.tool
+```
+If your loaded model has a different id, override with `--model <id>` or `OPENAI_MODEL=<id>`.
+
+#### mlx-lm (headless / scriptable)
+
+Pure CLI, no GUI required:
+
+```bash
+uv tool install mlx-lm
+mlx_lm.server --model mlx-community/Qwen2.5-14B-Instruct-4bit  # default port :8080
+
+# In another shell:
+OPENAI_BASE_URL=http://localhost:8080/v1 \
+  OPENAI_MODEL=mlx-community/Qwen2.5-14B-Instruct-4bit \
+  ./run.sh --with-agent --verbose
+```
+
+The server stays up across runs — model loaded once, stateless requests. Best for cron / overnight / automated workflows.
 
 #### Other compatible servers
 
-The same `--backend openai` works with: vLLM (`:8000/v1`), llama.cpp's `llama-server` (`:8080/v1`), `llama-cpp-python`'s server, and OpenAI proper (set `OPENAI_API_KEY` env var and `--base-url https://api.openai.com/v1`).
+The same `--backend openai` works with: vLLM (`:8000/v1`), llama.cpp's `llama-server` (`:8080/v1`), `llama-cpp-python`'s server, and OpenAI proper (set `OPENAI_API_KEY` and `--base-url https://api.openai.com/v1`).
+
+### Backend: Ollama (local, free)
+
+If you'd rather use Ollama instead of an OpenAI-compatible server:
+
+```bash
+brew install ollama
+ollama serve                    # auto-starts as service after install
+ollama pull qwen2.5:14b
+./run.sh --with-agent --backend ollama --model qwen2.5:14b
+```
+
+Ollama uses llama.cpp under the hood (no MLX), so on Apple Silicon expect ~2× slower than the openai/MLX path for the same model. Trade-off: Ollama auto-starts headless, no GUI dance.
+
+Other vetted models (see commit history for benchmark results): `deepseek-r1:14b` (similar quality, slightly slower), `llama3.1:8b` (faster but hallucinates more).
 
 ### Backend: Claude (cloud, costs tokens)
 

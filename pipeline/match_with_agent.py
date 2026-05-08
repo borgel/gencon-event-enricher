@@ -93,7 +93,19 @@ def _extras_bgg_csv(
 
 DEFAULT_BACKEND = "ollama"
 DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5"
-# Ollama default lives in pipeline.ollama_invoke.DEFAULT_OLLAMA_MODEL.
+# Ollama model default lives in pipeline.ollama_invoke.DEFAULT_OLLAMA_MODEL.
+
+# Backend-specific defaults for prompt sizing.
+#
+# Claude: prompt caching makes the popular-5k slice cheap on every call after
+#   the first; large batches don't help much.
+# Ollama: each /api/generate call reprocesses the full prompt with no prefix
+#   cache, so prompt processing time is the dominant cost. Smaller prompt
+#   slice + larger batch size both directly speed up the run.
+DEFAULTS_BY_BACKEND = {
+    "claude": {"batch_size": 50,  "popular_top_n": 5000},
+    "ollama": {"batch_size": 200, "popular_top_n": 500},
+}
 
 # Back-compat shim — older callers may still import this name.
 DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL
@@ -141,7 +153,8 @@ def run(
     invoker: Optional[ClaudeInvoker] = None,
     backend: str = DEFAULT_BACKEND,
     model: Optional[str] = None,
-    batch_size: int = 50,
+    batch_size: Optional[int] = None,
+    popular_top_n: Optional[int] = None,
     limit: Optional[int] = None,
     dry_run: bool = False,
     verbose: bool = False,
@@ -153,6 +166,12 @@ def run(
     effective_model = model or (
         DEFAULT_OLLAMA_MODEL if backend == "ollama" else DEFAULT_CLAUDE_MODEL
     )
+    # Resolve sizing defaults from the backend if caller didn't specify.
+    backend_defaults = DEFAULTS_BY_BACKEND.get(backend, DEFAULTS_BY_BACKEND["claude"])
+    if batch_size is None:
+        batch_size = backend_defaults["batch_size"]
+    if popular_top_n is None:
+        popular_top_n = backend_defaults["popular_top_n"]
 
     summary = RunSummary()
     blob = json.loads(agent_input_path.read_text())
@@ -184,7 +203,7 @@ def run(
     # didn't make the popular cut, so the prompt prefix stays byte-identical
     # across batches and Claude's prompt cache hits.
     bgg_rows = _read_bgg_rows(bgg_path)
-    popular_csv, popular_ids = _popular_bgg_csv(bgg_rows, top_n=5000)
+    popular_csv, popular_ids = _popular_bgg_csv(bgg_rows, top_n=popular_top_n)
 
     total_cost = 0.0
 
@@ -279,7 +298,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bgg", default="boardgames_ranks-*.csv")
     parser.add_argument("--manual", default="pipeline/mappings.yaml")
     parser.add_argument("--agent", default="pipeline/mappings.agent.yaml")
-    parser.add_argument("--batch-size", type=int, default=50)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help=("events per request. defaults to "
+                              f"{DEFAULTS_BY_BACKEND['ollama']['batch_size']} for ollama, "
+                              f"{DEFAULTS_BY_BACKEND['claude']['batch_size']} for claude."))
+    parser.add_argument("--popular-bgg-size", type=int, default=None,
+                        help=("how many of the most-rated BGG entries to include in "
+                              "the prompt as a general catalog (in addition to the "
+                              "per-batch fuzzy candidates, which are always included). "
+                              f"defaults to {DEFAULTS_BY_BACKEND['ollama']['popular_top_n']} "
+                              f"for ollama, {DEFAULTS_BY_BACKEND['claude']['popular_top_n']} "
+                              "for claude. set to 0 to omit entirely."))
     parser.add_argument("--limit", type=int, default=None,
                         help="cap the number of unmatched items processed in this run")
     parser.add_argument("--dry-run", action="store_true",
@@ -308,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=ns.backend,
         model=ns.model,
         batch_size=ns.batch_size,
+        popular_top_n=ns.popular_bgg_size,
         limit=ns.limit,
         dry_run=ns.dry_run,
         verbose=ns.verbose,

@@ -76,7 +76,8 @@ Useful flags:
 - `--model NAME` — override the per-backend default model.
 - `--dry-run` — print the prompt(s) without invoking the model.
 - `--limit N` — cap groups processed in this run.
-- `--batch-size N` — events per request (default 50).
+- `--batch-size N` — events per request (default 200 for ollama, 50 for claude).
+- `--popular-bgg-size N` — how many of the most-rated BGG entries to include in the prompt as a general catalog. Defaults: 500 (ollama), 5000 (claude). Set to 0 to omit entirely. Per-batch fuzzy candidates are always included regardless.
 - `-v` / `--verbose` — per-batch progress with token + cost stats.
 
 ### Backend: Ollama (default, local, free)

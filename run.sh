@@ -47,9 +47,22 @@ if (( with_agent )); then
         echo "  Or pass --backend ollama / --backend claude to bypass." >&2
         echo "" >&2
     fi
+    # Snapshot the agent mappings before the run so we can detect whether
+    # the agent actually added anything; if it didn't, the rebuild step is
+    # redundant (would produce identical events.json).
+    agent_yaml=pipeline/mappings.agent.yaml
+    file_sig() { stat -f '%m %z' "$1" 2>/dev/null || stat -c '%Y %s' "$1" 2>/dev/null || echo "missing"; }
+    before_sig=$(file_sig "$agent_yaml")
+
     uv run python -m pipeline.match_with_agent "$@"
-    echo "==> [3/3] Rebuilding to integrate new agent mappings"
-    uv run python -m pipeline.build
+
+    after_sig=$(file_sig "$agent_yaml")
+    if [[ "$before_sig" == "$after_sig" ]]; then
+        echo "==> Agent runner added no new mappings; skipping rebuild."
+    else
+        echo "==> [3/3] Rebuilding to integrate new agent mappings"
+        uv run python -m pipeline.build
+    fi
 else
     if [[ $# -gt 0 ]]; then
         echo "error: extra args ($*) only meaningful with --with-agent" >&2

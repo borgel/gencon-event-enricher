@@ -839,3 +839,121 @@ TCG-riftbound-learn-to-play-riftbound-4cf222:
   note: "high: Perfect match: game system 'Riftbound' exactly matches 'Riftbound:
     The League of Legends Trading Card Game' (2025) with 100% fuzzy score. This is
     clearly the TCG system referenced in the event."
+TDA-fang-fury-cc25ca:
+  bgg_id:
+  note: 'low: None of the candidates match a popular BGG entry.'
+TDA-castle-cravenmoor-e7b4e7:
+  bgg_id: 655
+  note: "high: Castle is the closest match and it's a well-known game."
+MHE-special-effects-for-minis-blood-rust-dirt-drool-more-2bb4f4:
+  bgg_id:
+  note: 'low: None of the candidates match a popular BGG entry.'
+NMN-tokyo-ho-7af96e:
+  bgg_id: 70323
+  note: "medium: King of Tokyo is the closest match, but it's not a perfect fit."
+RPG-johnny-hates-jazz-endless-terrors-9088c1:
+  bgg_id:
+  note: 'low: None of the candidates match a popular BGG entry.'
+WKS-make-a-renaissance-leather-ring-belt-237cac:
+  bgg_id:
+  note: 'high: The event is a workshop focused on crafting and not a tabletop game.'
+MHE-paint-cake-princess-of-coins-5024a9:
+  bgg_id: 73102
+  note: "medium: The event title mentions 'Princess of Coins' but the description
+    focuses on painting a miniature, which is more aligned with BGG entry 'Coins'."
+RPG-nascrag-shadows-over-n-awlins-tournament-dungeons-dragons-26247c:
+  bgg_id: 381926
+  note: "high: The event is a Dungeons & Dragons tournament, and 'Dungeons & Dragons:
+    Dungeon Scrawlers – Heroes of Waterdeep' seems the most relevant among the candidates."
+RPG-in-time-lost-light-in-the-deep-earthwild-210637:
+  bgg_id:
+  note: 'low: The event is a role-playing game but does not clearly match any BGG
+    entry provided.'
+RPG-bring-me-your-demigods-dungeons-dragons-7b280a:
+  bgg_id: 375307
+  note: "high: The event is a Dungeons & Dragons one-shot and 'Demigods' seems the
+    most relevant among the candidates."
+NMN-star-wars-pod-racing-mos-espa-homebrew-224d3e:
+  bgg_id: 405728
+  note: 'high: The event title and description clearly indicate Star Wars Pod Racing,
+    matching the BGG entry for Star Wars.'
+RPG-heroes-of-altamira-ep-23-behind-the-throne-7th-sea-33e8c9:
+  bgg_id: 175763
+  note: 'high: The event title and description match Behind the Throne, a game related
+    to 7th Sea RPG.'
+RPG-trial-of-the-godmakers-shadowdark-0819ef:
+  bgg_id:
+  note: 'low: None of the candidates match the event title or description closely
+    enough to be certain.'
+ZED-gathering-of-gamers-gen-con-history-book-pickup-q-a-8eea7d:
+  bgg_id:
+  note: 'high: The event is a book signing and Q&A session, not a tabletop game.'
+RPG-wizard-s-wandering-tower-dungeons-dragons-ef7f76:
+  bgg_id: 367820
+  note: 'high: The event title and description match The Yawning Portal, a Dungeons
+    & Dragons adventure.'
+RPG-hackwurld-hackmaster-508672:
+  bgg_id:
+  note: 'low: None of the candidates match the event title or description closely
+    enough to be certain.'
+RPG-the-road-to-frandor-s-keep-a-roll-n-run-experience-hackmaster-2cc6be:
+  bgg_id:
+  note: 'low: None of the candidates match the event title or description closely
+    enough to be certain.'
+SPA-earrings-from-knitting-needles-ab0134:
+  bgg_id:
+  note: 'high: The event is a crafting session, not a tabletop game.'
+BGM-neoimperialism-9fcc34:
+  bgg_id: 14544
+  note: 'medium: Imperialism matches the theme of geopolitical strategy but is an
+    older entry, and Neoimperialism may be a variant or expansion.'
+BGM-kinfire-delve-bingo-kinfire-delve-34d1ec:
+  bgg_id: 391795
+  note: "high: The event title and description match Kinfire Delve: Vainglory's Grotto,
+    a modern board game."
+RPG-in-the-belly-of-the-beast-dungeons-dragons-5e521e:
+  bgg_id: 367820
+  note: 'high: The event title and description match The Yawning Portal, a Dungeons
+    & Dragons adventure.'
+BGM-grand-photo-adventure-5af1f4:
+  bgg_id:
+  note: 'low: None of the candidates match the event title or description closely
+    enough to be certain.'
+SPA-making-your-own-stitch-markers-for-knitting-crochet-e3ecd3:
+  bgg_id:
+  note: 'high: The event is a crafting session, not a tabletop game.'
+NMN-heroscape-2026-world-championship-qualifying-heat-heroscape-c35b6c:
+  bgg_id: 466988
+  note: "high: The event title and description match Heroscape: Zanafor's Discovery
+    – Heroes of Trollsford Army Expansion."
+NMN-heroscape-battle-box-learn-to-play-heroscape-9402fe:
+  bgg_id: 466988
+  note: "high: The event title and description match Heroscape: Zanafor's Discovery
+    – Heroes of Trollsford Army Expansion."
+NMN-heroscape-8-player-draft-pod-heroscape-b9bd28:
+  bgg_id: 418140
+  note: 'high: The event title and description match DRAFT, a modern card game.'
+NMN-heroscape-2v2-battle-scenario-heroscape-a35c71:
+  bgg_id: 466988
+  note: "high: The event title and description match Heroscape: Zanafor's Discovery
+    – Heroes of Trollsford Army Expansion."
+RPG-28-light-years-later-vast-grim-780941:
+  bgg_id:
+  note: 'low: None of the candidates match the event title or description closely
+    enough to be certain.'
+SPA-painting-tiny-landscapes-the-easy-way-623a8e:
+  bgg_id:
+  note: 'high: The event is a crafting session, not a tabletop game.'
+CGM-atelier-firsts-and-forgeries-e535ba:
+  bgg_id: 311711
+  note: 'high: The event title and description match Atelier, an open drafting set
+    collection game.'
+RPG-gotham-city-major-crimes-killer-croc-s-one-stop-red-bat-ab6c0c:
+  bgg_id:
+  note: 'low: Not a tabletop game'
+RPG-cocaine-owlbear-honey-heist-09ee47:
+  bgg_id:
+  note: 'low: Not a tabletop game'
+RPG-yokai-tea-party-194dbb:
+  bgg_id:
+  note: 'low: Not a tabletop game'

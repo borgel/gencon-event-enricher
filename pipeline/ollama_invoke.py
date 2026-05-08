@@ -27,7 +27,7 @@ def invoke_ollama(
     model: str = DEFAULT_OLLAMA_MODEL,
     base_url: str = DEFAULT_OLLAMA_URL,
     num_ctx: int = DEFAULT_NUM_CTX,
-    timeout: float = 600.0,
+    timeout: float = 1800.0,
 ) -> str:
     """POST to /api/generate, wrap the response so parse_response accepts it.
 

@@ -16,12 +16,17 @@ The pipeline auto-globs the latest matching dump in the repo root, so refreshing
 uv sync --all-groups
 uv run playwright install chromium
 
-# whenever new dumps land
+# whenever new dumps land — single-command driver:
+./run.sh                                # build only (deterministic, free, ~3 min)
+./run.sh --with-agent                   # build → agent → rebuild
+./run.sh --with-agent --verbose         # show per-batch progress
+./run.sh --with-agent --backend claude  # use Claude API instead of local Ollama
+
+# or run the steps directly:
 uv run python -m pipeline.build
-# optional — let an LLM agent resolve unmatched events (requires `claude` CLI on PATH)
-uv run python -m pipeline.match_with_agent --dry-run --limit 5    # preview
-uv run python -m pipeline.match_with_agent                        # spend tokens
-uv run python -m pipeline.build                                   # re-run to integrate agent results
+uv run python -m pipeline.match_with_agent --dry-run --limit 5  # preview prompts
+uv run python -m pipeline.match_with_agent                      # default: ollama
+uv run python -m pipeline.build                                 # re-run to integrate
 
 # tests
 uv run pytest -v
@@ -61,15 +66,54 @@ Two subsystems, separated by `docs/data/events.json`:
 
 ## Agent runner
 
-`pipeline/match_with_agent.py` shells out to `claude -p ... --output-format json` with a prompt containing the BGG list + a batch of unmatched events. Validated responses (against `pipeline/agent_response_schema.json`) land in `pipeline/mappings.agent.yaml`. Requires the `claude` CLI on `PATH` and `ANTHROPIC_API_KEY` set.
+`pipeline/match_with_agent.py` resolves unmatched events by sending each batch to a model. The model is told the GenCon event title/system/description plus the top-5 BGG fuzzy candidates, and returns either a BGG id or `null` ("not a tabletop game"). Validated responses (against `pipeline/agent_response_schema.json`) land in `pipeline/mappings.agent.yaml`.
+
+The runner is resumable — keys already present in `mappings.yaml` or `mappings.agent.yaml` are skipped on subsequent runs.
 
 Useful flags:
 
-- `--dry-run` — print the prompt(s) without spending tokens.
-- `--limit N` — cap groups processed in this run (resumable across runs).
-- `--batch-size N` — adjust how many groups go in each Claude invocation (default 50).
+- `--backend ollama|claude` — which matcher to use (default: `ollama`).
+- `--model NAME` — override the per-backend default model.
+- `--dry-run` — print the prompt(s) without invoking the model.
+- `--limit N` — cap groups processed in this run.
+- `--batch-size N` — events per request (default 50).
+- `-v` / `--verbose` — per-batch progress with token + cost stats.
 
-The runner is resumable: a key already present in `mappings.yaml` or `mappings.agent.yaml` is skipped on subsequent runs, so you can iterate cheaply.
+### Backend: Ollama (default, local, free)
+
+Runs against a local model server. Setup once:
+
+```bash
+brew install ollama          # macOS
+# (or download from https://ollama.com)
+
+# In one shell, start the server (it auto-starts as a service after install):
+ollama serve
+
+# In another, pull a model. Recommended:
+ollama pull qwen2.5:14b      # default; ~9 GB, good at JSON/structured output
+# Alternatives:
+ollama pull llama3.1:8b      # ~5 GB, faster, slightly less precise
+ollama pull qwen2.5:32b      # ~20 GB, higher quality if you have RAM/GPU
+
+# Verify:
+ollama run qwen2.5:14b "say hi briefly"
+
+# Then run the pipeline:
+./run.sh --with-agent
+```
+
+The runner POSTs to `http://localhost:11434/api/generate` with `format: json` and `options.num_ctx: 65536` (the BGG popular-5k slice plus events comes to ~50k tokens). No API key. No cost.
+
+### Backend: Claude (cloud, costs tokens)
+
+Runs against the Anthropic API via the `claude` CLI. Requires `claude` on `PATH` and authentication already configured (Claude Code login or `ANTHROPIC_API_KEY`).
+
+```bash
+./run.sh --with-agent --backend claude --model claude-haiku-4-5
+```
+
+Default model is `claude-haiku-4-5` (cheap, ~$0.05/event at our prompt size). `claude-sonnet-4-6` and `claude-opus-4-7` are also fine if you want higher quality at higher cost.
 
 ## Repository layout
 

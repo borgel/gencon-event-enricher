@@ -17,6 +17,7 @@ from .agent_prompt import build_prompt
 from .agent_response import parse_response, ResponseError
 from .claude_invoke import ClaudeInvoker, invoke_claude_cli
 from .mappings import MappingEntry, load_mapping, save_mapping
+from .ollama_invoke import invoke_ollama, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL
 
 
 @dataclass
@@ -90,24 +91,45 @@ def _extras_bgg_csv(
     return "\n".join(out)
 
 
-DEFAULT_MODEL = "claude-haiku-4-5"
+DEFAULT_BACKEND = "ollama"
+DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5"
+# Ollama default lives in pipeline.ollama_invoke.DEFAULT_OLLAMA_MODEL.
+
+# Back-compat shim — older callers may still import this name.
+DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL
+
+
+def _build_default_invoker(backend: str, model: Optional[str]):
+    if backend == "claude":
+        m = model or DEFAULT_CLAUDE_MODEL
+        return lambda p: invoke_claude_cli(p, model=m)
+    if backend == "ollama":
+        m = model or DEFAULT_OLLAMA_MODEL
+        return lambda p: invoke_ollama(p, model=m)
+    raise ValueError(f"unknown backend: {backend!r} (expected 'claude' or 'ollama')")
 
 
 def _envelope_metadata(envelope: str) -> dict:
-    """Pull cost/usage metadata out of the Claude CLI's JSON envelope.
-    Returns {} if anything is missing — verbose output is best-effort."""
+    """Pull cost/usage metadata out of the response envelope.
+
+    Handles two shapes: Ollama's wrapped envelope (we emit a `_meta` key)
+    and Claude CLI's native envelope (`total_cost_usd` and `usage.*`).
+    Returns {} if anything is missing — verbose output is best-effort.
+    """
     try:
         d = json.loads(envelope)
-        return {
-            "cost": float(d.get("total_cost_usd", 0.0)),
-            "input_tokens": int(d.get("usage", {}).get("input_tokens", 0)),
-            "cache_read": int(d.get("usage", {}).get("cache_read_input_tokens", 0)),
-            "cache_create": int(d.get("usage", {}).get("cache_creation_input_tokens", 0)),
-            "output_tokens": int(d.get("usage", {}).get("output_tokens", 0)),
-            "duration_ms": int(d.get("duration_ms", 0)),
-        }
     except Exception:
         return {}
+    if isinstance(d.get("_meta"), dict):
+        return d["_meta"]
+    return {
+        "cost": float(d.get("total_cost_usd", 0.0)),
+        "input_tokens": int(d.get("usage", {}).get("input_tokens", 0)),
+        "cache_read": int(d.get("usage", {}).get("cache_read_input_tokens", 0)),
+        "cache_create": int(d.get("usage", {}).get("cache_creation_input_tokens", 0)),
+        "output_tokens": int(d.get("usage", {}).get("output_tokens", 0)),
+        "duration_ms": int(d.get("duration_ms", 0)),
+    }
 
 
 def run(
@@ -117,17 +139,20 @@ def run(
     manual_path: Path,
     agent_path: Path,
     invoker: Optional[ClaudeInvoker] = None,
-    model: Optional[str] = DEFAULT_MODEL,
+    backend: str = DEFAULT_BACKEND,
+    model: Optional[str] = None,
     batch_size: int = 50,
     limit: Optional[int] = None,
     dry_run: bool = False,
     verbose: bool = False,
 ) -> RunSummary:
-    # If the caller didn't supply a custom invoker, build one bound to the
-    # selected model. Tests pass their own invoker (which ignores model).
+    # If the caller didn't supply a custom invoker, build one for the
+    # selected backend. Tests pass their own invoker, which is unaffected.
     if invoker is None:
-        def invoker(prompt: str) -> str:
-            return invoke_claude_cli(prompt, model=model)
+        invoker = _build_default_invoker(backend, model)
+    effective_model = model or (
+        DEFAULT_OLLAMA_MODEL if backend == "ollama" else DEFAULT_CLAUDE_MODEL
+    )
 
     summary = RunSummary()
     blob = json.loads(agent_input_path.read_text())
@@ -150,7 +175,7 @@ def run(
     n_batches = (len(items) + batch_size - 1) // batch_size
     if verbose:
         print(f"Agent runner: {len(items)} events in {n_batches} batches "
-              f"of up to {batch_size} (model: {model or 'default'}, "
+              f"of up to {batch_size} (backend: {backend}, model: {effective_model}, "
               f"skipping {summary.skipped_already_mapped} already-mapped)",
               file=sys.stderr, flush=True)
 
@@ -229,12 +254,19 @@ def run(
             total_cost += md.get("cost", 0.0)
             tokens_str = ""
             if md:
-                # Format token counts as Kk for legibility.
-                ci = md["cache_create"] // 1000
-                cr = md["cache_read"] // 1000
-                ot = md["output_tokens"]
-                tokens_str = f", cache_create={ci}k cache_read={cr}k out={ot}"
-            cost_str = f", ${md['cost']:.3f} (run total ${total_cost:.2f})" if md else ""
+                # Claude reports cache_create / cache_read; Ollama reports
+                # input_tokens. Pick whichever fields are present.
+                if "cache_create" in md or "cache_read" in md:
+                    ci = md.get("cache_create", 0) // 1000
+                    cr = md.get("cache_read", 0) // 1000
+                    ot = md.get("output_tokens", 0)
+                    tokens_str = f", cache_create={ci}k cache_read={cr}k out={ot}"
+                else:
+                    in_ = md.get("input_tokens", 0) // 1000
+                    ot = md.get("output_tokens", 0)
+                    tokens_str = f", in={in_}k out={ot}"
+            cost = md.get("cost", 0.0) if md else 0.0
+            cost_str = f", ${cost:.3f} (run total ${total_cost:.2f})" if cost > 0 else ""
             print(f" {elapsed:.1f}s → {n_id} matched, {n_null} null{tokens_str}{cost_str}",
                   file=sys.stderr, flush=True)
 
@@ -252,8 +284,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="cap the number of unmatched items processed in this run")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the prompt(s) without invoking claude")
-    parser.add_argument("--model", default=DEFAULT_MODEL,
-                        help=f"Claude model to use (default: {DEFAULT_MODEL})")
+    parser.add_argument("--backend", choices=("ollama", "claude"), default=DEFAULT_BACKEND,
+                        help=f"matcher backend (default: {DEFAULT_BACKEND})")
+    parser.add_argument("--model", default=None,
+                        help=("model name for the chosen backend. defaults to "
+                              f"{DEFAULT_OLLAMA_MODEL!r} for ollama, "
+                              f"{DEFAULT_CLAUDE_MODEL!r} for claude."))
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="print per-batch progress + cost as the run proceeds")
     ns = parser.parse_args(argv)
@@ -269,10 +305,11 @@ def main(argv: list[str] | None = None) -> int:
         bgg_path=Path(bgg_matches[-1]),
         manual_path=Path(ns.manual),
         agent_path=Path(ns.agent),
+        backend=ns.backend,
+        model=ns.model,
         batch_size=ns.batch_size,
         limit=ns.limit,
         dry_run=ns.dry_run,
-        model=ns.model,
         verbose=ns.verbose,
     )
     print("Agent runner summary:")

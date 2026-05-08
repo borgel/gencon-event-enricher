@@ -72,7 +72,7 @@ The runner is resumable — keys already present in `mappings.yaml` or `mappings
 
 Useful flags:
 
-- `--backend ollama|claude` — which matcher to use (default: `ollama`).
+- `--backend ollama|openai|claude` — which matcher to use (default: `ollama`).
 - `--model NAME` — override the per-backend default model.
 - `--dry-run` — print the prompt(s) without invoking the model.
 - `--limit N` — cap groups processed in this run.
@@ -105,6 +105,44 @@ ollama run qwen2.5:14b "say hi briefly"
 ```
 
 The runner POSTs to `http://localhost:11434/api/generate` with `format: json` and `options.num_ctx: 65536` (the BGG popular-5k slice plus events comes to ~50k tokens). No API key. No cost.
+
+### Backend: OpenAI-compatible server (local MLX or any OpenAI-API server)
+
+`--backend openai` POSTs to `<base_url>/chat/completions` with a JSON-output request. Works against any server implementing the OpenAI Chat Completions API. On Apple Silicon, **MLX-accelerated serving is 1.5–2.5× faster than llama.cpp** for the same model, so this is the fastest local option.
+
+#### Recommended (headless): mlx-lm
+
+```bash
+# one-time
+pip install mlx-lm                                                       # or `uv tool install mlx-lm`
+
+# in one shell, run the server (defaults to :8080)
+mlx_lm.server --model mlx-community/Qwen2.5-14B-Instruct-4bit
+
+# in another, run the matcher (default --base-url is mlx-lm's :8080/v1)
+./run.sh --with-agent --backend openai --verbose
+```
+
+The server stays up across runs — model is loaded once, requests are stateless. To use a different model, restart the server with a different `--model` flag (browse `mlx-community` on Hugging Face).
+
+#### Alternative: LM Studio
+
+If you prefer a GUI for model browsing:
+
+1. Download from <https://lmstudio.ai>.
+2. In the Discover tab, filter for "MLX" and download an MLX-format model (e.g. `mlx-community/Qwen2.5-14B-Instruct-4bit`).
+3. In the Developer / Local Server tab, load that model and start the server.
+4. Run the matcher pointing at LM Studio's port:
+
+```bash
+./run.sh --with-agent --backend openai --base-url http://localhost:1234/v1 --model qwen2.5-14b-instruct --verbose
+```
+
+Both paths produce the same API surface for our pipeline. mlx-lm wins on scriptability (it's a process you can manage with launchd/systemd/supervisord); LM Studio wins on ergonomics if you're trying many models.
+
+#### Other compatible servers
+
+The same `--backend openai` works with: vLLM (`:8000/v1`), llama.cpp's `llama-server` (`:8080/v1`), `llama-cpp-python`'s server, and OpenAI proper (set `OPENAI_API_KEY` env var and `--base-url https://api.openai.com/v1`).
 
 ### Backend: Claude (cloud, costs tokens)
 

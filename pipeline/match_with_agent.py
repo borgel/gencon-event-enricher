@@ -18,6 +18,9 @@ from .agent_response import parse_response, ResponseError
 from .claude_invoke import ClaudeInvoker, invoke_claude_cli
 from .mappings import MappingEntry, load_mapping, save_mapping
 from .ollama_invoke import invoke_ollama, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL
+from .openai_compat_invoke import (
+    invoke_openai, DEFAULT_OPENAI_MODEL, DEFAULT_OPENAI_BASE_URL,
+)
 
 
 @dataclass
@@ -93,32 +96,41 @@ def _extras_bgg_csv(
 
 DEFAULT_BACKEND = "ollama"
 DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5"
-# Ollama model default lives in pipeline.ollama_invoke.DEFAULT_OLLAMA_MODEL.
+# Per-backend model defaults live in their invoker modules.
 
 # Backend-specific defaults for prompt sizing.
 #
 # Claude: prompt caching makes the popular-5k slice cheap on every call after
 #   the first; large batches don't help much.
-# Ollama: each /api/generate call reprocesses the full prompt with no prefix
-#   cache, so prompt processing time is the dominant cost. Smaller prompt
-#   slice + larger batch size both directly speed up the run.
+# Ollama / openai (local MLX/GGUF): each call reprocesses the full prompt
+#   with no prefix cache, so prompt size is the dominant cost. Smaller
+#   slice + larger batch both directly speed up the run.
 DEFAULTS_BY_BACKEND = {
     "claude": {"batch_size": 50,  "popular_top_n": 5000},
     "ollama": {"batch_size": 200, "popular_top_n": 500},
+    "openai": {"batch_size": 200, "popular_top_n": 500},
 }
 
 # Back-compat shim — older callers may still import this name.
 DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL
 
 
-def _build_default_invoker(backend: str, model: Optional[str]):
+def _build_default_invoker(
+    backend: str, model: Optional[str], *, base_url: Optional[str] = None,
+):
     if backend == "claude":
         m = model or DEFAULT_CLAUDE_MODEL
         return lambda p: invoke_claude_cli(p, model=m)
     if backend == "ollama":
         m = model or DEFAULT_OLLAMA_MODEL
         return lambda p: invoke_ollama(p, model=m)
-    raise ValueError(f"unknown backend: {backend!r} (expected 'claude' or 'ollama')")
+    if backend == "openai":
+        m = model or DEFAULT_OPENAI_MODEL
+        u = base_url or DEFAULT_OPENAI_BASE_URL
+        return lambda p: invoke_openai(p, model=m, base_url=u)
+    raise ValueError(
+        f"unknown backend: {backend!r} (expected 'claude', 'ollama', or 'openai')"
+    )
 
 
 def _envelope_metadata(envelope: str) -> dict:
@@ -153,6 +165,7 @@ def run(
     invoker: Optional[ClaudeInvoker] = None,
     backend: str = DEFAULT_BACKEND,
     model: Optional[str] = None,
+    base_url: Optional[str] = None,
     batch_size: Optional[int] = None,
     popular_top_n: Optional[int] = None,
     limit: Optional[int] = None,
@@ -162,9 +175,11 @@ def run(
     # If the caller didn't supply a custom invoker, build one for the
     # selected backend. Tests pass their own invoker, which is unaffected.
     if invoker is None:
-        invoker = _build_default_invoker(backend, model)
+        invoker = _build_default_invoker(backend, model, base_url=base_url)
     effective_model = model or (
-        DEFAULT_OLLAMA_MODEL if backend == "ollama" else DEFAULT_CLAUDE_MODEL
+        DEFAULT_OPENAI_MODEL if backend == "openai" else
+        DEFAULT_OLLAMA_MODEL if backend == "ollama" else
+        DEFAULT_CLAUDE_MODEL
     )
     # Resolve sizing defaults from the backend if caller didn't specify.
     backend_defaults = DEFAULTS_BY_BACKEND.get(backend, DEFAULTS_BY_BACKEND["claude"])
@@ -313,12 +328,18 @@ def main(argv: list[str] | None = None) -> int:
                         help="cap the number of unmatched items processed in this run")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the prompt(s) without invoking claude")
-    parser.add_argument("--backend", choices=("ollama", "claude"), default=DEFAULT_BACKEND,
+    parser.add_argument("--backend", choices=("ollama", "openai", "claude"),
+                        default=DEFAULT_BACKEND,
                         help=f"matcher backend (default: {DEFAULT_BACKEND})")
     parser.add_argument("--model", default=None,
                         help=("model name for the chosen backend. defaults to "
                               f"{DEFAULT_OLLAMA_MODEL!r} for ollama, "
+                              f"{DEFAULT_OPENAI_MODEL!r} for openai, "
                               f"{DEFAULT_CLAUDE_MODEL!r} for claude."))
+    parser.add_argument("--base-url", default=None,
+                        help=("base URL for --backend openai. defaults to "
+                              f"{DEFAULT_OPENAI_BASE_URL} (mlx-lm). use "
+                              "http://localhost:1234/v1 for LM Studio, etc."))
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="print per-batch progress + cost as the run proceeds")
     ns = parser.parse_args(argv)
@@ -336,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         agent_path=Path(ns.agent),
         backend=ns.backend,
         model=ns.model,
+        base_url=ns.base_url,
         batch_size=ns.batch_size,
         popular_top_n=ns.popular_bgg_size,
         limit=ns.limit,

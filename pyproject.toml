@@ -8,6 +8,7 @@ dependencies = [
     "rapidfuzz>=3.9",
     "ruamel.yaml>=0.18",
     "jsonschema>=4.21",
+    "numpy>=2.0",
 ]
 
 [dependency-groups]

@@ -5,6 +5,7 @@ import { getSaved, getPurchased, replaceSaved, replacePurchased } from './saved.
 import { exportSchedule, parseScheduleCSV, triggerDownload } from './schedule.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
+import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
 
@@ -150,6 +151,7 @@ function renderResultsToolbar(state, onChange) {
       <button id="s-dir" type="button">${LABELS[state.sortKey][state.sortDir]}</button>
     </div>
     <div class="toolbar-right">
+      <button id="s-timeline" type="button" class="${state.viewMode === 'timeline' ? 'active' : ''}">🗓️ Timeline</button>
       <button id="s-saved" type="button" class="${state.savedOnly ? 'active' : ''}">★ Saved (0)</button>
       <button id="s-lucky" type="button" disabled>🎲 I'm Feeling Lucky</button>
     </div>
@@ -170,6 +172,10 @@ function renderResultsToolbar(state, onChange) {
   });
   document.querySelector('#s-saved').addEventListener('click', () => {
     state.savedOnly = !state.savedOnly;
+    onChange();
+  });
+  document.querySelector('#s-timeline').addEventListener('click', () => {
+    state.viewMode = state.viewMode === 'timeline' ? 'list' : 'timeline';
     onChange();
   });
 }
@@ -224,6 +230,10 @@ async function main() {
     onChange: () => applyFilters(),
     onShow: (g) => { openGroup = g; },
     onClose: () => { openGroup = null; },
+  });
+  const timelineView = createTimelineView({
+    container: $('#results-timeline'),
+    onEventClick: (g) => detailView.show(g, latestOverlap.perSession),
   });
 
   function attachLuckyHandler() {
@@ -342,11 +352,32 @@ async function main() {
       savedBtn.textContent = `★ Saved (${saved.size})`;
       savedBtn.classList.toggle('active', state.savedOnly);
     }
-    tableView.setRows(visible, {
-      saved,
-      purchased,
-      conflicts: latestOverlap.conflictedGroups,
-    });
+    const tlBtn = document.querySelector('#s-timeline');
+    if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');
+    if (state.viewMode === 'timeline') {
+      $('#results-list').classList.add('hidden');
+      $('#results-timeline').classList.remove('hidden');
+      const conflictedSessionIds = new Set(
+        [...overlapInfo.perSession.entries()]
+          .filter(([, info]) => !info.fits)
+          .map(([sid]) => sid)
+      );
+      timelineView.render(
+        blob.groups,
+        saved,
+        purchased,
+        conflictedSessionIds,
+        openGroup,
+      );
+    } else {
+      $('#results-timeline').classList.add('hidden');
+      $('#results-list').classList.remove('hidden');
+      tableView.setRows(visible, {
+        saved,
+        purchased,
+        conflicts: latestOverlap.conflictedGroups,
+      });
+    }
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +
       `${blob.meta.stats.matched.toLocaleString()} matched / ` +

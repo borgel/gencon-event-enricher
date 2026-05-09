@@ -859,3 +859,35 @@ def test_timeline_preview_blocks_unit(server):
         assert result["saved"] == 0
         ctx.close()
         browser.close()
+
+
+def test_toolbar_timeline_toggle(server):
+    """Clicking the 🗓️ Timeline button switches the results pane to timeline view."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#s-timeline")
+        # Initially: list visible, timeline hidden.
+        assert "hidden" in page.eval_on_selector("#results-timeline", "e => e.className")
+        assert "hidden" not in page.eval_on_selector("#results-list", "e => e.className")
+        # Click the timeline toggle.
+        page.click("#s-timeline")
+        page.wait_for_function(
+            "!document.querySelector('#results-timeline').classList.contains('hidden')"
+        )
+        assert "hidden" in page.eval_on_selector("#results-list", "e => e.className")
+        assert "hidden" not in page.eval_on_selector("#results-timeline", "e => e.className")
+        # Hash records the mode.
+        h = page.evaluate("() => window.location.hash")
+        assert "view=timeline" in h
+        # Toggle back.
+        page.click("#s-timeline")
+        page.wait_for_function(
+            "document.querySelector('#results-timeline').classList.contains('hidden')"
+        )
+        h2 = page.evaluate("() => window.location.hash")
+        assert "view=timeline" not in h2
+        ctx.close()
+        browser.close()

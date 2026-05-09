@@ -260,3 +260,7 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 }
 .tl-out.before { top: 2px; }
 .tl-out.after { bottom: 2px; }
+
+#results-toolbar #s-timeline.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}

@@ -152,8 +152,21 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   font: inherit;
   padding: 0.2rem 0.5rem;
 }
-#f-clear {
+#f-clear,
+#f-export,
+.file-button {
   font: inherit;
   padding: 0.3rem 0.6rem;
   width: 100%;
+  display: block;
+  margin-bottom: 4px;
+  text-align: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  box-sizing: border-box;
 }
+.file-button:hover,
+#f-export:hover,
+#f-clear:hover { background: #f0f0f0; }

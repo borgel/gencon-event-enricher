@@ -38,3 +38,7 @@ export function togglePurchased(key) {
   write(PURCHASED_KEY, s);
   return s.has(key);
 }
+
+// Bulk replacement, used by schedule import.
+export function replaceSaved(newSet) { write(SAVED_KEY, new Set(newSet)); }
+export function replacePurchased(newSet) { write(PURCHASED_KEY, new Set(newSet)); }

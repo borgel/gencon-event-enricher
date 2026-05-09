@@ -411,6 +411,64 @@ def test_row_marks_show_saved_and_purchased(server):
         browser.close()
 
 
+def test_schedule_export_downloads_csv(server):
+    """The Export schedule button triggers a CSV download with marked sessions."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Save the BGM (Wingspan) session.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        # Trigger export and capture the download.
+        with page.expect_download() as info:
+            page.click("#f-export")
+        dl = info.value
+        path = dl.path()
+        body = Path(path).read_text()
+        lines = body.strip().split("\n")
+        # Header + 1 data row for the saved session.
+        assert lines[0] == "event_id,gencon_id,title,when,saved,purchased"
+        assert any("BGM26ND000001" in ln and "1,0" in ln for ln in lines[1:])
+        ctx.close()
+        browser.close()
+
+
+def test_schedule_import_replaces_state(tmp_path, server):
+    """Picking a CSV via the Import button replaces saved/purchased after confirm."""
+    # Build a CSV that marks the SEM session as purchased only.
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,0,1\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        # Auto-accept the confirm dialog.
+        page.on("dialog", lambda d: d.accept())
+        # Upload the file via the hidden file input.
+        page.set_input_files("#f-import", str(csv_path))
+        # After import: toolbar count = 0 saved, but ★ Saved button updates to 0.
+        page.wait_for_function(
+            "document.querySelector('#s-saved').textContent.includes('(0)')"
+        )
+        # The SEM row now has the 🎟 mark; the BGM row has none.
+        sem_row_marks = page.eval_on_selector_all(
+            ".row .marks", "els => els.map(e => e.textContent)"
+        )
+        joined = "|".join(sem_row_marks)
+        assert "🎟" in joined  # purchased SEM row shows the ticket glyph
+        assert "★" not in joined  # nothing saved
+        ctx.close()
+        browser.close()
+
+
 def test_purchased_orthogonal_to_saved(server):
     """Purchased and Saved are independent flags (Q1=A)."""
     with sync_playwright() as p:

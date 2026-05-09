@@ -1,7 +1,8 @@
 import { loadData } from './data.js';
 import { defaultState, buildPredicate, stateToHash, hashToState } from './filters.js';
 import { buildIndex, searchKeys } from './search.js';
-import { getSaved, getPurchased } from './saved.js';
+import { getSaved, getPurchased, replaceSaved, replacePurchased } from './saved.js';
+import { exportSchedule, parseScheduleCSV, triggerDownload } from './schedule.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
@@ -88,6 +89,12 @@ function renderFilterRail(state, onChange) {
     </div>
     <div class="group">
       <button id="f-clear" type="button">Clear filters</button>
+    </div>
+    <div class="group">
+      <div class="label">Schedule</div>
+      <button id="f-export" type="button">Export schedule</button>
+      <label class="file-button" for="f-import">Import schedule</label>
+      <input type="file" id="f-import" accept=".csv,text/csv" hidden>
     </div>
   `;
   $('#filter-rail').innerHTML = html;
@@ -217,6 +224,33 @@ async function main() {
     });
   }
 
+  function attachScheduleHandlers() {
+    document.querySelector('#f-export').addEventListener('click', () => {
+      const csv = exportSchedule(blob.groups, getSaved(), getPurchased());
+      const today = new Date().toISOString().slice(0, 10);
+      triggerDownload(`gencon-schedule-${today}.csv`, csv);
+    });
+    document.querySelector('#f-import').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const result = parseScheduleCSV(text, blob.groups);
+      const summary = `${result.matched} sessions matched` +
+        (result.missed ? `, ${result.missed} not found in current data` : '');
+      const ok = window.confirm(
+        `Import schedule?\n\n${summary}.\n\n` +
+        `This will replace your current Saved and Purchased state.`,
+      );
+      if (ok) {
+        replaceSaved(result.saved);
+        replacePurchased(result.purchased);
+        applyFilters();
+      }
+      // Reset so the same file can be re-selected later.
+      e.target.value = '';
+    });
+  }
+
   function attachClearHandler() {
     document.querySelector('#f-clear').addEventListener('click', () => {
       // Reset all filters; flip ticketsOnly OFF (so sold-out events also show);
@@ -244,6 +278,7 @@ async function main() {
     renderResultsToolbar(state, applyFilters);
     attachLuckyHandler();
     attachClearHandler();
+    attachScheduleHandlers();
   }
 
   renderAllFilterUI();

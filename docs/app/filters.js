@@ -4,6 +4,8 @@
 //     party, costBand, age, experience, ticketsOnly, tournament,
 //     locations: Set<string>, bggMin, hasBggOnly, savedOnly }
 
+import { applyHashPair as applySortHashPair, sortStateToHash } from './sort.js';
+
 export function defaultState() {
   return {
     search: '',
@@ -21,6 +23,8 @@ export function defaultState() {
     bggMin: 0,
     hasBggOnly: false,
     savedOnly: false,
+    sortKey: 'start',
+    sortDir: 'asc',
   };
 }
 
@@ -125,6 +129,8 @@ export function stateToHash(state) {
   if (state.bggMin > 0)   parts.push(`bgg=${state.bggMin}`);
   if (state.hasBggOnly)   parts.push(`bggOnly=1`);
   if (state.savedOnly)    parts.push(`saved=1`);
+  const sortFrag = sortStateToHash({ key: state.sortKey, dir: state.sortDir });
+  if (sortFrag) parts.push(sortFrag);
   return parts.join('&');
 }
 
@@ -150,6 +156,13 @@ export function hashToState(hash) {
       case 'bgg': s.bggMin = +dv; break;
       case 'bggOnly': s.hasBggOnly = dv === '1'; break;
       case 'saved': s.savedOnly = dv === '1'; break;
+      case 'sort':
+      case 'dir': {
+        const tmp = { key: s.sortKey, dir: s.sortDir };
+        applySortHashPair(tmp, k, dv);
+        s.sortKey = tmp.key; s.sortDir = tmp.dir;
+        break;
+      }
     }
   }
   return s;

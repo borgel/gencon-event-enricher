@@ -109,6 +109,37 @@ def test_page_loads_and_lists_groups(server):
         browser.close()
 
 
+def test_results_toolbar_renders_with_sort_controls(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#results-toolbar")
+        assert page.query_selector("#results-toolbar #s-key") is not None
+        assert page.query_selector("#results-toolbar #s-dir") is not None
+        # Sort key options
+        keys = page.eval_on_selector_all(
+            "#s-key option", "els => els.map(e => e.value)"
+        )
+        assert keys == ["start", "type", "bgg"]
+        browser.close()
+
+
+def test_sort_changes_row_order(server):
+    """Switching to BGG-desc puts the BGG-rated row first."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.select_option("#s-key", "bgg")
+        # Direction button defaults to bgg's default (desc), so no toggle needed.
+        page.wait_for_function("document.querySelectorAll('.row')[0].textContent.includes('Wingspan')")
+        first_text = page.eval_on_selector(".row", "e => e.textContent")
+        assert "Wingspan" in first_text
+        browser.close()
+
+
 def test_view_table_scroll_to_key_exists(server):
     """Construct a tableView via the page and verify scrollToKey is callable."""
     with sync_playwright() as p:

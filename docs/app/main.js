@@ -4,6 +4,7 @@ import { buildIndex, searchKeys } from './search.js';
 import { getSaved } from './saved.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
+import { defaultSortState, KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -108,6 +109,35 @@ function renderFilterRail(state, onChange) {
   });
 }
 
+function renderResultsToolbar(state, onChange) {
+  const html = `
+    <div class="toolbar-left">
+      <label for="s-key">Sort:</label>
+      <select id="s-key">
+        ${KEY_OPTIONS.map(([v, l]) =>
+          `<option value="${v}"${state.sortKey === v ? ' selected' : ''}>${l}</option>`
+        ).join('')}
+      </select>
+      <button id="s-dir" type="button">${LABELS[state.sortKey][state.sortDir]}</button>
+    </div>
+    <div class="toolbar-right"></div>
+  `;
+  document.querySelector('#results-toolbar').innerHTML = html;
+
+  document.querySelector('#s-key').addEventListener('change', (e) => {
+    state.sortKey = e.target.value;
+    // Reset direction to that key's natural default (start=asc, type=asc, bgg=desc).
+    state.sortDir = e.target.value === 'bgg' ? 'desc' : 'asc';
+    document.querySelector('#s-dir').textContent = LABELS[state.sortKey][state.sortDir];
+    onChange();
+  });
+  document.querySelector('#s-dir').addEventListener('click', () => {
+    state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    document.querySelector('#s-dir').textContent = LABELS[state.sortKey][state.sortDir];
+    onChange();
+  });
+}
+
 function populateMultiselect(id, values, set, onChange) {
   const target = document.getElementById(id);
   target.innerHTML = values.map(v =>
@@ -152,12 +182,15 @@ async function main() {
     shell: $('#app-shell'),
   });
 
+  renderResultsToolbar(state, applyFilters);
+
   function applyFilters() {
     const saved = getSaved();
     const pred = buildPredicate(state, saved);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);
     if (hits) visible = visible.filter(g => hits.has(g.key));
+    visible.sort(compareGroups({ key: state.sortKey, dir: state.sortDir }));
     tableView.setRows(visible);
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +

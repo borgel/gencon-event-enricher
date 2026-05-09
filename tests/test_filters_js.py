@@ -23,7 +23,10 @@ window.F = F;
 
 def _serve(route):
     url = route.request.url
-    if "/docs/app/filters.js" in url:
+    if "/docs/app/sort.js" in url:
+        body = (ROOT / "docs" / "app" / "sort.js").read_text()
+        route.fulfill(body=body, content_type="application/javascript")
+    elif "/docs/app/filters.js" in url:
         body = (ROOT / "docs" / "app" / "filters.js").read_text()
         route.fulfill(body=body, content_type="application/javascript")
     elif "/harness" in url:
@@ -113,3 +116,31 @@ def test_predicate_filters_by_type(page):
     obj = json.loads(_eval(page, js))
     assert obj["bgm"] is True
     assert obj["rpg"] is False
+
+
+def test_hash_roundtrip_includes_sort(page):
+    """Sort state must round-trip through filters.stateToHash/hashToState."""
+    js = """
+    const s = F.defaultState();
+    s.sortKey = 'bgg';
+    s.sortDir = 'desc';
+    const h = F.stateToHash(s);
+    const back = F.hashToState(h);
+    return JSON.stringify({ h, sortKey: back.sortKey, sortDir: back.sortDir });
+    """
+    obj = json.loads(_eval(page, js))
+    assert "sort=bgg" in obj["h"]
+    assert "dir=desc" in obj["h"]
+    assert obj["sortKey"] == "bgg"
+    assert obj["sortDir"] == "desc"
+
+
+def test_hash_omits_default_sort(page):
+    """Defaults are never written to the hash."""
+    js = """
+    const s = F.defaultState();
+    return F.stateToHash(s);
+    """
+    h = _eval(page, js)
+    assert "sort=" not in h
+    assert "dir=" not in h

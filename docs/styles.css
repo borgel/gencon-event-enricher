@@ -91,3 +91,23 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   text-align: left; padding: 3px 6px; border-bottom: 1px solid #eee;
 }
 .starred { color: #d97706; }
+
+#results-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--rule, #ddd);
+}
+#results-toolbar .toolbar-left,
+#results-toolbar .toolbar-right {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+#results-toolbar select,
+#results-toolbar button {
+  font: inherit;
+  padding: 0.2rem 0.5rem;
+}

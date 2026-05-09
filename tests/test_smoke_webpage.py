@@ -106,6 +106,15 @@ def test_page_loads_and_lists_groups(server):
         panel = page.query_selector("#detail-panel")
         assert "hidden" not in panel.get_attribute("class").split()
         assert "Wingspan: Asia" in page.inner_text("#detail-panel")
+
+        # Session row's GenCon link uses the direct /events/<num> URL pattern,
+        # not the legacy /events?search=<id> form.
+        href = page.eval_on_selector(
+            "#detail-panel table.sessions a[href*='gencon.com/events']",
+            "e => e.href",
+        )
+        # Fixture's gencon_id is BGM26ND000001 → trailing digits 000001
+        assert href == "https://www.gencon.com/events/000001"
         browser.close()
 
 

@@ -5,11 +5,12 @@ export function bggUrl(bggId) {
   return `https://boardgamegeek.com/boardgame/${bggId}`;
 }
 
-// GenCon's event finder accepts a search query. The Game ID search reliably
-// surfaces a single event. If GenCon ships a more direct deep-link in the
-// future, swap it in here.
+// GenCon's per-event page is at /events/<numeric-id>. The alphanumeric
+// gencon_id is "<EVENTTYPE>26ND<numeric>" (e.g. BGM26ND313243 → /events/313243).
+// Fall back to the event-finder search if the ID doesn't parse.
 export function genconUrl(gameId) {
   if (!gameId) return null;
-  const q = encodeURIComponent(gameId);
-  return `https://www.gencon.com/events?search=${q}`;
+  const m = String(gameId).match(/(\d+)$/);
+  if (m) return `https://www.gencon.com/events/${m[1]}`;
+  return `https://www.gencon.com/events?search=${encodeURIComponent(gameId)}`;
 }

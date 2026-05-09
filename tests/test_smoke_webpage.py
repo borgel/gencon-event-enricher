@@ -107,3 +107,25 @@ def test_page_loads_and_lists_groups(server):
         assert "hidden" not in panel.get_attribute("class").split()
         assert "Wingspan: Asia" in page.inner_text("#detail-panel")
         browser.close()
+
+
+def test_view_table_scroll_to_key_exists(server):
+    """Construct a tableView via the page and verify scrollToKey is callable."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-table.js');
+          const container = document.createElement('div');
+          container.style.height = '100px';
+          document.body.appendChild(container);
+          const v = mod.createTableView({ container, rowHeightPx: 30, onRowClick: () => {} });
+          v.setRows([{ key: 'a', title: 'a', sessions: [{}] }, { key: 'b', title: 'b', sessions: [{}] }]);
+          return typeof v.scrollToKey === 'function';
+        }
+        """)
+        assert result is True
+        browser.close()

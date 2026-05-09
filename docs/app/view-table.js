@@ -64,6 +64,16 @@ export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
         el.classList.toggle('selected', rows[idx]?.key === key);
       }
     },
+    scrollToKey(key) {
+      // Linear search is fine — dataset is at most ~50k rows; this runs once
+      // per Lucky-button click, not per scroll.
+      const idx = rows.findIndex((r) => r.key === key);
+      if (idx < 0) return false;
+      const desiredTop = idx * rowHeightPx - container.clientHeight / 2;
+      container.scrollTop = Math.max(0, desiredTop);
+      render();
+      return true;
+    },
   };
 }
 

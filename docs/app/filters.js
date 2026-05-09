@@ -50,7 +50,7 @@ function costBandOf(cost) {
 
 export function buildPredicate(state, savedKeys) {
   return (g) => {
-    if (state.savedOnly && !savedKeys.has(g.key)) return false;
+    if (state.savedOnly && !g.sessions.some(s => savedKeys.has(s.gencon_id))) return false;
     if (state.bggMatch === 'yes' && !g.bgg) return false;
     if (state.bggMatch === 'no'  && g.bgg)  return false;
     if (state.bggMin > 0) {

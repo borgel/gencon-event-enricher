@@ -19,17 +19,23 @@ export function createDetailView({ panel, onCloseToggle, onChange }) {
     show(group) {
       panel.innerHTML = render(group);
       panel.querySelector('.close').addEventListener('click', close);
-      const star = panel.querySelector('.save-toggle');
-      star.addEventListener('click', () => {
-        toggleSaved(group.key);
-        star.classList.toggle('starred');
-        star.textContent = isSaved(group.key) ? '★ Saved' : '☆ Save';
-        fireChange();
-      });
-      const purchased = panel.querySelector('.purchased-cb');
-      purchased.addEventListener('change', () => {
-        togglePurchased(group.key);
-        fireChange();
+      // Wire per-session toggles. Each .session-card carries its session id
+      // in data-session-id; saved/purchased state is keyed on that.
+      panel.querySelectorAll('.session-card').forEach((card) => {
+        const sid = card.dataset.sessionId;
+        if (!sid) return;
+        const star = card.querySelector('.save-toggle');
+        star?.addEventListener('click', () => {
+          toggleSaved(sid);
+          star.classList.toggle('starred');
+          star.textContent = isSaved(sid) ? '★ Saved' : '☆ Save';
+          fireChange();
+        });
+        const purchased = card.querySelector('.purchased-cb');
+        purchased?.addEventListener('change', () => {
+          togglePurchased(sid);
+          fireChange();
+        });
       });
       open();
     },
@@ -38,28 +44,16 @@ export function createDetailView({ panel, onCloseToggle, onChange }) {
 }
 
 function render(g) {
-  const saved = isSaved(g.key);
-  const purchased = isPurchased(g.key);
   return `
     <span class="close" title="Close detail">✕</span>
     <h2>${escape(g.title)}</h2>
     <div class="meta">${escape(g.event_type_label)} · ${formatPlayers(g)} · ${formatCost(g)} · ${escape(g.age_required)} · ${escape(g.experience_required)}</div>
-    <div class="event-actions">
-      <button class="save-toggle ${saved ? 'starred' : ''}">${saved ? '★ Saved' : '☆ Save'}</button>
-      <label class="purchased-toggle">
-        <input type="checkbox" class="purchased-cb"${purchased ? ' checked' : ''}>
-        🎟️ Tickets purchased
-      </label>
-    </div>
     ${signupRow(g)}
     ${g.bgg ? bggCard(g.bgg) : '<div class="meta" style="font-style:italic">No BGG match.</div>'}
     <h3 style="margin-top:14px;font-size:14px">Description</h3>
     <p>${escape(g.long_description || g.short_description)}</p>
     <h3 style="margin-top:14px;font-size:14px">Sessions (${g.sessions.length})</h3>
-    <table class="sessions">
-      <thead><tr><th>When</th><th>Where</th><th>GM</th><th>Tix</th><th>Round</th><th></th></tr></thead>
-      <tbody>${g.sessions.map(s => sessionRow(s, g)).join('')}</tbody>
-    </table>
+    ${g.sessions.map(s => sessionCard(s, g)).join('')}
   `;
 }
 
@@ -105,22 +99,37 @@ function categoryRank(ranks) {
   return ` · #${entry[1]} ${entry[0]}`;
 }
 
-function sessionRow(s, g) {
+function sessionCard(s, g) {
   const start = new Date(s.start);
   const end = s.end ? new Date(s.end) : null;
+  const saved = isSaved(s.gencon_id);
+  const purchased = isPurchased(s.gencon_id);
   const cal = googleCalendarUrl(g, s);
+  const where = [
+    s.location, s.room, s.table ? `Table ${s.table}` : null,
+  ].filter(Boolean).map(escape).join(' · ');
+  const tix = s.tickets_available ?? '—';
+  const round = s.total_rounds && s.total_rounds > 1
+    ? ` · Round ${s.round_number || '?'}/${s.total_rounds}` : '';
   return `
-    <tr>
-      <td>${formatDay(start)} ${formatTime(start)}${end ? '–' + formatTime(end) : ''}</td>
-      <td>${escape(s.location || '')}${s.room ? ' · ' + escape(s.room) : ''}${s.table ? ' · t' + escape(s.table) : ''}</td>
-      <td>${escape(s.gm || '')}</td>
-      <td>${s.tickets_available ?? '—'}</td>
-      <td>${s.total_rounds && s.total_rounds > 1 ? (s.round_number || '?') + '/' + s.total_rounds : ''}</td>
-      <td class="session-actions">
-        <a href="${genconUrl(s.gencon_id)}" target="_blank" rel="noopener" title="Open on GenCon">↗</a>
-        ${cal ? `<a href="${cal}" target="_blank" rel="noopener" title="Add to Google Calendar">📅</a>` : ''}
-      </td>
-    </tr>
+    <div class="session-card" data-session-id="${escape(s.gencon_id)}">
+      <div class="session-when">${formatDay(start)} ${formatTime(start)}${end ? '–' + formatTime(end) : ''}</div>
+      ${where ? `<div class="session-where">${where}</div>` : ''}
+      <div class="session-meta">
+        ${s.gm ? `GM: ${escape(s.gm)} · ` : ''}${tix} tickets${round}
+      </div>
+      <div class="session-actions">
+        <button class="save-toggle ${saved ? 'starred' : ''}">${saved ? '★ Saved' : '☆ Save'}</button>
+        <label class="purchased-toggle">
+          <input type="checkbox" class="purchased-cb"${purchased ? ' checked' : ''}>
+          🎟️ Tickets purchased
+        </label>
+        <span class="session-links">
+          <a href="${genconUrl(s.gencon_id)}" target="_blank" rel="noopener" title="Open on GenCon">↗</a>
+          ${cal ? `<a href="${cal}" target="_blank" rel="noopener" title="Add to Google Calendar">📅</a>` : ''}
+        </span>
+      </div>
+    </div>
   `;
 }
 

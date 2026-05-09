@@ -101,8 +101,8 @@ function makeRow(g, userState) {
 }
 
 function formatMarks(g, userState) {
-  const saved = userState?.saved?.has(g.key);
-  const purchased = userState?.purchased?.has(g.key);
+  const saved = userState?.saved && g.sessions?.some(s => userState.saved.has(s.gencon_id));
+  const purchased = userState?.purchased && g.sessions?.some(s => userState.purchased.has(s.gencon_id));
   return `${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
 }
 

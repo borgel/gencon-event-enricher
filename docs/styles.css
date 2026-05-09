@@ -102,10 +102,7 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   font-size: 12px; text-decoration: none; white-space: nowrap;
 }
 #detail-panel .signup-btn:hover { background: #2563eb; border-color: #2563eb; }
-#detail-panel .event-actions {
-  display: flex; flex-wrap: wrap; align-items: center;
-  gap: 10px; margin: 6px 0;
-}
+
 #detail-panel .purchased-toggle {
   display: inline-flex; align-items: center; gap: 4px;
   cursor: pointer; user-select: none;
@@ -115,14 +112,23 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 #results-toolbar #s-saved.active {
   background: var(--accent); color: #fff; border-color: var(--accent);
 }
-#detail-panel table.sessions { width: 100%; border-collapse: collapse; font-size: 12px; }
-#detail-panel table.sessions th, #detail-panel table.sessions td {
-  text-align: left; padding: 3px 6px; border-bottom: 1px solid #eee;
+
+#detail-panel .session-card {
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 8px 10px; margin: 6px 0; background: #fff;
 }
-#detail-panel table.sessions td.session-actions {
-  white-space: nowrap;
+#detail-panel .session-card .session-when {
+  font-weight: 600; font-size: 13px;
 }
-#detail-panel table.sessions td.session-actions a {
+#detail-panel .session-card .session-where,
+#detail-panel .session-card .session-meta {
+  color: var(--muted); font-size: 12px;
+}
+#detail-panel .session-card .session-actions {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 10px; margin-top: 6px;
+}
+#detail-panel .session-card .session-links a {
   text-decoration: none; margin-right: 4px;
 }
 .starred { color: #d97706; }

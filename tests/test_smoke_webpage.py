@@ -107,10 +107,10 @@ def test_page_loads_and_lists_groups(server):
         assert "hidden" not in panel.get_attribute("class").split()
         assert "Wingspan: Asia" in page.inner_text("#detail-panel")
 
-        # Session row's GenCon link uses the direct /events/<num> URL pattern,
+        # Session card's GenCon link uses the direct /events/<num> URL pattern,
         # not the legacy /events?search=<id> form.
         href = page.eval_on_selector(
-            "#detail-panel table.sessions a[href*='gencon.com/events']",
+            "#detail-panel .session-card a[href*='gencon.com/events']",
             "e => e.href",
         )
         # Fixture's gencon_id is BGM26ND000001 → trailing digits 000001
@@ -130,7 +130,7 @@ def test_page_loads_and_lists_groups(server):
         # Each session row also has a Google Calendar link with prefilled
         # title/dates/details/location and the GenCon timezone.
         cal_href = page.eval_on_selector(
-            "#detail-panel table.sessions a[href*='google.com/calendar']",
+            "#detail-panel .session-card a[href*='google.com/calendar']",
             "e => e.href",
         )
         assert cal_href.startswith("https://www.google.com/calendar/event?")

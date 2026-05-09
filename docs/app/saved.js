@@ -1,9 +1,13 @@
-// Tiny localStorage-backed sets of event keys. Two independent flags:
-// `saved` (interest/wishlist) and `purchased` (tickets bought). They're
-// orthogonal — one does not imply the other.
+// Tiny localStorage-backed sets of session IDs (s.gencon_id). Two
+// independent flags: `saved` (interest/wishlist) and `purchased` (tickets
+// bought). They're orthogonal — one does not imply the other.
+//
+// v2 switched from group keys to session IDs so users can mark individual
+// sessions (e.g., "Dixit Thu 9am" but not "Dixit Fri 2pm"). v1 entries are
+// abandoned in localStorage; harmless dead data.
 
-const SAVED_KEY = 'gencon-enricher.saved.v1';
-const PURCHASED_KEY = 'gencon-enricher.purchased.v1';
+const SAVED_KEY = 'gencon-enricher.saved.v2';
+const PURCHASED_KEY = 'gencon-enricher.purchased.v2';
 
 function read(key) {
   try {

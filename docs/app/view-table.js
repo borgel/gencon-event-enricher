@@ -89,6 +89,9 @@ export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
 function makeRow(g, userState) {
   const row = document.createElement('div');
   row.className = 'row';
+  if (userState?.conflicts && userState.conflicts.has(g.key)) {
+    row.classList.add('conflict');
+  }
   row.innerHTML = `
     <span class="marks">${formatMarks(g, userState)}</span>
     <span class="when">${formatWhen(g)}</span>
@@ -103,7 +106,8 @@ function makeRow(g, userState) {
 function formatMarks(g, userState) {
   const saved = userState?.saved && g.sessions?.some(s => userState.saved.has(s.gencon_id));
   const purchased = userState?.purchased && g.sessions?.some(s => userState.purchased.has(s.gencon_id));
-  return `${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
+  const conflict = userState?.conflicts && userState.conflicts.has(g.key);
+  return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
 }
 
 function formatWhen(g) {

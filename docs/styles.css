@@ -186,3 +186,5 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 #detail-panel .session-fit.conflict {
   color: #dc2626;
 }
+.row.conflict { background: #fef2f2; }
+.row.conflict:hover { background: #fee2e2; }

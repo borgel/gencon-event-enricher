@@ -701,3 +701,21 @@ def test_session_card_fit_line_renders(server):
         assert "Fits" in text or "Conflicts" in text
         ctx.close()
         browser.close()
+
+
+def test_row_marker_no_conflict_by_default(server):
+    """Default state: no rows have the conflict marker (fixture has no overlaps)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        marks = page.eval_on_selector_all(
+            ".row .marks", "els => els.map(e => e.textContent).join('|')"
+        )
+        assert "⚠" not in marks
+        n = page.eval_on_selector_all(".row.conflict", "els => els.length")
+        assert n == 0
+        ctx.close()
+        browser.close()

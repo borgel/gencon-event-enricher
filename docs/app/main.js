@@ -342,7 +342,11 @@ async function main() {
       savedBtn.textContent = `★ Saved (${saved.size})`;
       savedBtn.classList.toggle('active', state.savedOnly);
     }
-    tableView.setRows(visible, { saved, purchased });
+    tableView.setRows(visible, {
+      saved,
+      purchased,
+      conflicts: latestOverlap.conflictedGroups,
+    });
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +
       `${blob.meta.stats.matched.toLocaleString()} matched / ` +

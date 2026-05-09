@@ -7,6 +7,7 @@ const OVERSCAN = 8;
 export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
   let rows = [];
   let selectedKey = null;
+  let userState = { saved: new Set(), purchased: new Set() };
 
   // DOM: spacer (sets total height) + content layer (positions absolute rows).
   const spacer = document.createElement('div');
@@ -34,7 +35,7 @@ export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
     // Add rows inside the window.
     for (let i = startIdx; i < endIdx; i++) {
       if (visible.has(i)) continue;
-      const el = makeRow(rows[i]);
+      const el = makeRow(rows[i], userState);
       el.style.position = 'absolute';
       el.style.top = (i * rowHeightPx) + 'px';
       el.style.left = '0'; el.style.right = '0';
@@ -49,13 +50,21 @@ export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
   window.addEventListener('resize', render);
 
   return {
-    setRows(newRows) {
+    setRows(newRows, newUserState) {
+      // Heuristic: if the row count and edges match, we treat this as an
+      // in-place refresh (e.g. user toggled saved/purchased on an event in
+      // the detail panel) and preserve scroll. Otherwise reset to top.
+      const sameShape =
+        rows.length === newRows.length &&
+        rows[0]?.key === newRows[0]?.key &&
+        rows[rows.length - 1]?.key === newRows[newRows.length - 1]?.key;
       rows = newRows;
+      if (newUserState) userState = newUserState;
       spacer.style.height = (newRows.length * rowHeightPx) + 'px';
       // Hard reset visible map (group identities may differ even if indices line up).
       for (const el of visible.values()) el.remove();
       visible.clear();
-      container.scrollTop = 0;
+      if (!sameShape) container.scrollTop = 0;
       render();
     },
     setSelectedKey(key) {
@@ -77,10 +86,11 @@ export function createTableView({ container, rowHeightPx = 32, onRowClick }) {
   };
 }
 
-function makeRow(g) {
+function makeRow(g, userState) {
   const row = document.createElement('div');
   row.className = 'row';
   row.innerHTML = `
+    <span class="marks">${formatMarks(g, userState)}</span>
     <span class="when">${formatWhen(g)}</span>
     <span class="title">${escape(g.title)} <span class="meta">${formatMeta(g)}</span></span>
     <span class="meta">${escape(g.event_type)}</span>
@@ -88,6 +98,12 @@ function makeRow(g) {
     <span class="bgg ${g.bgg ? '' : 'none'}">${formatBgg(g)}</span>
   `;
   return row;
+}
+
+function formatMarks(g, userState) {
+  const saved = userState?.saved?.has(g.key);
+  const purchased = userState?.purchased?.has(g.key);
+  return `${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
 }
 
 function formatWhen(g) {

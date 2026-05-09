@@ -367,6 +367,34 @@ def test_purchased_toggle_persists(server):
         browser.close()
 
 
+def test_row_marks_show_saved_and_purchased(server):
+    """Rows display ★ for saved and 🎟️ for purchased events."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Initially: no marks anywhere.
+        marks_text = page.eval_on_selector_all(
+            ".row .marks", "els => els.map(e => e.textContent).join('|')"
+        )
+        assert marks_text == "|"  # 2 rows in fixture, both empty
+        # Save the first row (Wingspan), tick its purchased.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        page.click("#detail-panel .purchased-cb")
+        # Row now shows both marks.
+        page.wait_for_function(
+            "[...document.querySelectorAll('.row .marks')].some(e => e.textContent.includes('★'))"
+        )
+        first_marks = page.eval_on_selector(".row:first-child .marks", "e => e.textContent")
+        assert "★" in first_marks
+        assert "🎟" in first_marks  # match either 🎟️ (with VS-16) or 🎟 alone
+        ctx.close()
+        browser.close()
+
+
 def test_purchased_orthogonal_to_saved(server):
     """Purchased and Saved are independent flags (Q1=A)."""
     with sync_playwright() as p:

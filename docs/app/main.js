@@ -1,7 +1,7 @@
 import { loadData } from './data.js';
 import { defaultState, buildPredicate, stateToHash, hashToState } from './filters.js';
 import { buildIndex, searchKeys } from './search.js';
-import { getSaved } from './saved.js';
+import { getSaved, getPurchased } from './saved.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
@@ -250,6 +250,7 @@ async function main() {
 
   function applyFilters() {
     const saved = getSaved();
+    const purchased = getPurchased();
     const pred = buildPredicate(state, saved);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);
@@ -263,7 +264,7 @@ async function main() {
       savedBtn.textContent = `★ Saved (${saved.size})`;
       savedBtn.classList.toggle('active', state.savedOnly);
     }
-    tableView.setRows(visible);
+    tableView.setRows(visible, { saved, purchased });
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +
       `${blob.meta.stats.matched.toLocaleString()} matched / ` +

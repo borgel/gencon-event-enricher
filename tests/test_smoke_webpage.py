@@ -288,3 +288,76 @@ def test_lucky_button_disabled_when_empty(server):
         disabled = page.eval_on_selector("#s-lucky", "e => e.disabled")
         assert disabled is True
         browser.close()
+
+
+def test_popstate_repopulates_type_chips(server):
+    """Regression: type/location chip groups must survive Back/Forward navigation.
+
+    Pre-existing bug (I-2 from prior review): renderFilterRail wipes #f-types
+    on popstate, but populateMultiselect wasn't re-called, leaving an empty
+    div until hard reload. The renderAllFilterUI helper fixes this.
+    """
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector('#f-types .chip[data-val="BGM"]')
+        # Toggle a type to push hash state.
+        page.click('#f-types .chip[data-val="BGM"]')
+        page.wait_for_function("window.location.hash.includes('types=BGM')")
+        # Simulate Back navigation: clear hash, fire popstate.
+        page.evaluate("""
+        () => {
+          history.replaceState(null, '', '#');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }
+        """)
+        # After popstate, the type chips must still be present (not just an
+        # empty container).
+        page.wait_for_function(
+            "document.querySelectorAll('#f-types .chip').length > 0"
+        )
+        # And no chip should be active (since hash is empty).
+        active = page.eval_on_selector_all(
+            "#f-types .chip.active", "els => els.length"
+        )
+        assert active == 0
+        browser.close()
+
+
+def test_clear_filters_resets_filters_preserves_sort(server):
+    """Clear button: reset filters, untick ticketsOnly, preserve sort."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Set non-default state: pick a type, switch sort to BGG-desc.
+        page.click('#f-types .chip[data-val="BGM"]')
+        page.wait_for_function("document.querySelectorAll('.row').length === 1")
+        page.select_option("#s-key", "bgg")
+        page.wait_for_function("window.location.hash.includes('sort=bgg')")
+        # Sanity: hash currently has both filter and sort fragments.
+        h = page.evaluate("() => window.location.hash")
+        assert "types=BGM" in h and "sort=bgg" in h
+
+        # Click clear.
+        page.click("#f-clear")
+
+        # Both fixture rows visible again.
+        page.wait_for_function("document.querySelectorAll('.row').length === 2")
+        # ticketsOnly is now unchecked (Q1=C — clear flips it off, even though
+        # it defaults to true on first load).
+        tix = page.eval_on_selector("#f-tix", "e => e.checked")
+        assert tix is False
+        # Type chip no longer active.
+        active_types = page.eval_on_selector_all(
+            "#f-types .chip.active", "els => els.length"
+        )
+        assert active_types == 0
+        # Hash no longer carries filter keys, but sort is preserved.
+        h2 = page.evaluate("() => window.location.hash")
+        assert "types=" not in h2
+        assert "tix=0" in h2  # because ticketsOnly is now false
+        assert "sort=bgg" in h2  # sort preserved
+        browser.close()

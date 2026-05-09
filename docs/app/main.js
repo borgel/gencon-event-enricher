@@ -87,6 +87,9 @@ function renderFilterRail(state, onChange) {
       <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label><br>
       <label><input type="checkbox" id="f-saved" ${state.savedOnly?'checked':''}> Saved only</label>
     </div>
+    <div class="group">
+      <button id="f-clear" type="button">Clear filters</button>
+    </div>
   `;
   $('#filter-rail').innerHTML = html;
 
@@ -178,7 +181,6 @@ async function main() {
   let state = hashToState(window.location.hash);
   const index = buildIndex(blob.groups);
 
-  renderFilterRail(state, applyFilters);
   // Build a "Full Label (CODE)" map from the dataset. event_type_label in
   // GenCon data is formatted "CODE - Full Label" — strip the "CODE - " prefix.
   const typeLabels = {};
@@ -189,19 +191,9 @@ async function main() {
     const human = (m ? m[1] : raw).trim();
     typeLabels[g.event_type] = `${human} (${g.event_type})`;
   }
-  populateMultiselect(
-    'f-types',
-    [...new Set(blob.groups.map(g => g.event_type))].sort(),
-    state.types,
-    applyFilters,
-    typeLabels,
-  );
-  populateMultiselect(
-    'f-locations',
-    [...new Set(blob.groups.map(g => g.sessions[0]?.location).filter(Boolean))].sort(),
-    state.locations,
-    applyFilters,
-  );
+  const uniqueTypes = [...new Set(blob.groups.map(g => g.event_type))].sort();
+  const uniqueLocations =
+    [...new Set(blob.groups.map(g => g.sessions[0]?.location).filter(Boolean))].sort();
 
   const tableView = createTableView({
     container: $('#results-list'),
@@ -221,8 +213,37 @@ async function main() {
       tableView.setSelectedKey(g.key);
     });
   }
-  renderResultsToolbar(state, applyFilters);
-  attachLuckyHandler();
+
+  function attachClearHandler() {
+    document.querySelector('#f-clear').addEventListener('click', () => {
+      // Reset all filters; flip ticketsOnly OFF (so sold-out events also show);
+      // preserve current sort. Reassigning rather than mutating so closures
+      // captured by re-rendered handlers bind to the new object.
+      state = {
+        ...defaultState(),
+        ticketsOnly: false,
+        sortKey: state.sortKey,
+        sortDir: state.sortDir,
+      };
+      renderAllFilterUI();
+      applyFilters();
+    });
+  }
+
+  // Re-render every part of the filter UI. Used at initial mount, on popstate,
+  // and after Clear. Keeps the three call sites from drifting (a single forgotten
+  // populateMultiselect call here previously caused chips to vanish after
+  // back/forward navigation).
+  function renderAllFilterUI() {
+    renderFilterRail(state, applyFilters);
+    populateMultiselect('f-types', uniqueTypes, state.types, applyFilters, typeLabels);
+    populateMultiselect('f-locations', uniqueLocations, state.locations, applyFilters);
+    renderResultsToolbar(state, applyFilters);
+    attachLuckyHandler();
+    attachClearHandler();
+  }
+
+  renderAllFilterUI();
 
   function applyFilters() {
     const saved = getSaved();
@@ -245,9 +266,7 @@ async function main() {
 
   window.addEventListener('popstate', () => {
     state = hashToState(window.location.hash);
-    renderFilterRail(state, applyFilters);
-    renderResultsToolbar(state, applyFilters);
-    attachLuckyHandler();
+    renderAllFilterUI();
     applyFilters();
   });
 

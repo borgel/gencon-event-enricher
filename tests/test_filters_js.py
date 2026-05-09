@@ -329,3 +329,30 @@ def test_hash_roundtrip_kitchen_sink(page):
     assert back["sortKey"] == "bgg"
     assert back["sortDir"] == "desc"
     assert back["ticketsOnly"] is False
+
+
+def test_view_mode_default_is_list(page):
+    s = _eval(page, "return F.defaultState().viewMode")
+    assert s == "list"
+
+
+def test_view_mode_hash_default_omitted(page):
+    js = """
+    const s = F.defaultState();
+    return F.stateToHash(s);
+    """
+    h = _eval(page, js)
+    assert "view=" not in h
+
+
+def test_view_mode_hash_roundtrip(page):
+    js = """
+    const s = F.defaultState();
+    s.viewMode = 'timeline';
+    const h = F.stateToHash(s);
+    const back = F.hashToState(h);
+    return JSON.stringify({ h, viewMode: back.viewMode });
+    """
+    obj = json.loads(_eval(page, js))
+    assert "view=timeline" in obj["h"]
+    assert obj["viewMode"] == "timeline"

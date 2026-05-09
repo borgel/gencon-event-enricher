@@ -25,6 +25,7 @@ export function defaultState() {
     savedOnly: false,
     sortKey: 'start',
     sortDir: 'asc',
+    viewMode: 'list',
   };
 }
 
@@ -143,6 +144,7 @@ export function stateToHash(state, options = {}) {
   if (state.savedOnly)    parts.push(`saved=1`);
   const sortFrag = sortStateToHash({ key: state.sortKey, dir: state.sortDir });
   if (sortFrag) parts.push(sortFrag);
+  if (state.viewMode === 'timeline') parts.push('view=timeline');
   return parts.join('&');
 }
 
@@ -172,6 +174,9 @@ export function hashToState(hash) {
         if (dv === 'yes' || dv === 'no' || dv === 'either') s.bggMatch = dv;
         break;
       case 'saved': s.savedOnly = dv === '1'; break;
+      case 'view':
+        if (dv === 'timeline' || dv === 'list') s.viewMode = dv;
+        break;
       case 'sort':
       case 'dir': {
         const tmp = { key: s.sortKey, dir: s.sortDir };

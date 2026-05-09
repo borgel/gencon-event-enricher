@@ -719,3 +719,41 @@ def test_row_marker_no_conflict_by_default(server):
         assert n == 0
         ctx.close()
         browser.close()
+
+
+def test_timeline_renders_saved_and_purchased(server):
+    """Construct timeline view and verify it draws blocks for saved/purchased."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-timeline.js');
+          const container = document.createElement('div');
+          container.style.height = '700px';
+          document.body.appendChild(container);
+          const view = mod.createTimelineView({
+            container,
+            onEventClick: () => {},
+          });
+          const groups = [
+            { key: 'G1', title: 'Wingspan',
+              sessions: [{ gencon_id: 'A', start: '2026-07-30T09:00:00', end: '2026-07-30T13:00:00' }] },
+            { key: 'G2', title: 'Cosplay',
+              sessions: [{ gencon_id: 'B', start: '2026-07-31T10:00:00', end: '2026-07-31T11:00:00' }] },
+          ];
+          view.render(groups, new Set(['A']), new Set(['B']), null, null);
+          return {
+            saved: container.querySelectorAll('.tl-saved').length,
+            purchased: container.querySelectorAll('.tl-purchased').length,
+            days: container.querySelectorAll('.tl-day').length,
+          };
+        }
+        """)
+        assert result["saved"] == 1
+        assert result["purchased"] == 1
+        assert result["days"] == 2
+        ctx.close()
+        browser.close()

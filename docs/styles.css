@@ -188,3 +188,75 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 }
 .row.conflict { background: #fef2f2; }
 .row.conflict:hover { background: #fee2e2; }
+
+#results-timeline {
+  flex: 1; overflow: auto;
+  background: #fff;
+}
+#results-timeline.hidden { display: none; }
+
+.tl-root {
+  display: flex;
+  align-items: flex-start;
+  min-width: max-content;
+  font: 12px/1.3 system-ui, sans-serif;
+}
+.tl-hour-rail {
+  position: sticky; left: 0; z-index: 2;
+  background: #fff; border-right: 1px solid #ddd;
+}
+.tl-hour-header { height: 28px; background: #f4f4f4; border-bottom: 1px solid #ccc; }
+.tl-hour-body { display: flex; flex-direction: column; }
+.tl-hour-label {
+  font-size: 10px; color: #666;
+  text-align: right; padding: 0 6px 0 0;
+  border-bottom: 1px solid #eee;
+  line-height: 1; padding-top: 2px;
+}
+.tl-day {
+  border-right: 1px solid #eee;
+  flex-shrink: 0;
+}
+.tl-day-header {
+  height: 28px;
+  background: #f4f4f4;
+  border-bottom: 1px solid #ccc;
+  font-weight: 600; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.tl-day-body {
+  background:
+    repeating-linear-gradient(to bottom,
+      transparent 0,
+      transparent 39px,
+      #eee 39px,
+      #eee 40px);
+}
+.tl-event {
+  position: absolute; top: 0;
+  border-radius: 3px; padding: 3px 5px;
+  font-size: 11px; line-height: 1.2;
+  overflow: hidden; cursor: pointer;
+  border: 1px solid; box-sizing: border-box;
+}
+.tl-saved { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+.tl-purchased { background: #dcfce7; border-color: #16a34a; color: #14532d; }
+.tl-preview {
+  background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 4px, #fde68a 4px, #fde68a 8px);
+  border-color: #d97706; color: #92400e; border-style: dashed;
+}
+.tl-conflict { box-shadow: 0 0 0 2px #dc2626; z-index: 1; }
+.tl-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-meta { font-size: 10px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-badge {
+  position: absolute; right: 3px; top: 3px;
+  background: #dc2626; color: #fff; font-size: 9px;
+  padding: 0 4px; border-radius: 8px;
+  line-height: 14px; height: 14px;
+}
+.tl-out {
+  position: absolute; right: 4px;
+  font-size: 12px; font-weight: bold;
+}
+.tl-out.before { top: 2px; }
+.tl-out.after { bottom: 2px; }

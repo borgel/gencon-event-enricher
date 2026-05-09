@@ -272,3 +272,55 @@ def test_duration_default_omitted_from_hash(page):
     h = _eval(page, js)
     assert "durMin=" not in h
     assert "durMax=" not in h
+
+
+def test_hash_roundtrip_kitchen_sink(page):
+    """Round-trip a URL hash that exercises every new key plus a few existing ones."""
+    js = """
+    const s = F.defaultState();
+    s.search = 'wingspan asia';
+    s.days = new Set(['thu', 'fri']);
+    s.types = new Set(['BGM', 'RPG']);
+    s.bggMin = 7.5;
+    s.bggMatch = 'yes';
+    s.durMinH = 1.5;
+    s.durMaxH = 4;
+    s.sortKey = 'bgg';
+    s.sortDir = 'desc';
+    s.ticketsOnly = false;
+    const h = F.stateToHash(s);
+    const back = F.hashToState(h);
+    return JSON.stringify({
+      h,
+      back: { ...back,
+        days: [...back.days].sort(),
+        types: [...back.types].sort(),
+        locations: [...back.locations],
+      },
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    h = obj["h"]
+    # Every new fragment present
+    assert "sort=bgg" in h
+    assert "dir=desc" in h
+    assert "bggMatch=yes" in h
+    assert "durMin=1.5" in h
+    assert "durMax=4" in h
+    # Pre-existing fragments still present
+    assert "bgg=7.5" in h
+    assert "tix=0" in h
+    assert "types=" in h
+    assert "days=" in h
+    # Round-trip correctness
+    back = obj["back"]
+    assert back["search"] == "wingspan asia"
+    assert back["days"] == ["fri", "thu"]
+    assert back["types"] == ["BGM", "RPG"]
+    assert back["bggMin"] == 7.5
+    assert back["bggMatch"] == "yes"
+    assert back["durMinH"] == 1.5
+    assert back["durMaxH"] == 4
+    assert back["sortKey"] == "bgg"
+    assert back["sortDir"] == "desc"
+    assert back["ticketsOnly"] is False

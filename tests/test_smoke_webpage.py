@@ -126,6 +126,22 @@ def test_page_loads_and_lists_groups(server):
         assert len(btns) == 1
         assert "Thu" in btns[0]["text"]  # fixture session starts 2026-07-30 (Thu)
         assert btns[0]["href"] == "https://www.gencon.com/events/000001"
+
+        # Each session row also has a Google Calendar link with prefilled
+        # title/dates/details/location and the GenCon timezone.
+        cal_href = page.eval_on_selector(
+            "#detail-panel table.sessions a[href*='google.com/calendar']",
+            "e => e.href",
+        )
+        assert cal_href.startswith("https://www.google.com/calendar/event?")
+        assert "action=TEMPLATE" in cal_href
+        # Wall-clock dates from fixture (no timezone math; ctz handles it):
+        # 2026-07-30T09:00 -> 20260730T090000, end 13:00 -> 20260730T130000
+        assert "dates=20260730T090000%2F20260730T130000" in cal_href
+        assert "ctz=America%2FIndiana%2FIndianapolis" in cal_href
+        # Title contains the event title and gencon_id
+        assert "Wingspan" in cal_href
+        assert "BGM26ND000001" in cal_href
         browser.close()
 
 

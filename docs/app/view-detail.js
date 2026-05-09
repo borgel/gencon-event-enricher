@@ -1,4 +1,4 @@
-import { bggUrl, genconUrl } from './links.js';
+import { bggUrl, genconUrl, googleCalendarUrl } from './links.js';
 import { isSaved, toggleSaved, isPurchased, togglePurchased } from './saved.js';
 
 export function createDetailView({ panel, onCloseToggle, onChange }) {
@@ -58,7 +58,7 @@ function render(g) {
     <h3 style="margin-top:14px;font-size:14px">Sessions (${g.sessions.length})</h3>
     <table class="sessions">
       <thead><tr><th>When</th><th>Where</th><th>GM</th><th>Tix</th><th>Round</th><th></th></tr></thead>
-      <tbody>${g.sessions.map(sessionRow).join('')}</tbody>
+      <tbody>${g.sessions.map(s => sessionRow(s, g)).join('')}</tbody>
     </table>
   `;
 }
@@ -105,9 +105,10 @@ function categoryRank(ranks) {
   return ` · #${entry[1]} ${entry[0]}`;
 }
 
-function sessionRow(s) {
+function sessionRow(s, g) {
   const start = new Date(s.start);
   const end = s.end ? new Date(s.end) : null;
+  const cal = googleCalendarUrl(g, s);
   return `
     <tr>
       <td>${formatDay(start)} ${formatTime(start)}${end ? '–' + formatTime(end) : ''}</td>
@@ -115,7 +116,10 @@ function sessionRow(s) {
       <td>${escape(s.gm || '')}</td>
       <td>${s.tickets_available ?? '—'}</td>
       <td>${s.total_rounds && s.total_rounds > 1 ? (s.round_number || '?') + '/' + s.total_rounds : ''}</td>
-      <td><a href="${genconUrl(s.gencon_id)}" target="_blank" rel="noopener">↗</a></td>
+      <td class="session-actions">
+        <a href="${genconUrl(s.gencon_id)}" target="_blank" rel="noopener" title="Open on GenCon">↗</a>
+        ${cal ? `<a href="${cal}" target="_blank" rel="noopener" title="Add to Google Calendar">📅</a>` : ''}
+      </td>
     </tr>
   `;
 }

@@ -119,6 +119,12 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 #detail-panel table.sessions th, #detail-panel table.sessions td {
   text-align: left; padding: 3px 6px; border-bottom: 1px solid #eee;
 }
+#detail-panel table.sessions td.session-actions {
+  white-space: nowrap;
+}
+#detail-panel table.sessions td.session-actions a {
+  text-decoration: none; margin-right: 4px;
+}
 .starred { color: #d97706; }
 
 #results-toolbar {

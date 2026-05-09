@@ -1,6 +1,6 @@
 // Filter state shape (all optional / null = no filter):
 //   { search, days: Set<'thu'|'fri'|'sat'|'sun'>, hourMin, hourMax,
-//     types: Set<string>, durationBands: Set<'short'|'med'|'long'>,
+//     types: Set<string>, durMinH, durMaxH,
 //     party, costBand, age, experience, ticketsOnly, tournament,
 //     locations: Set<string>, bggMin, bggMatch, savedOnly }
 
@@ -12,7 +12,7 @@ export function defaultState() {
     days: new Set(),
     hourMin: 0, hourMax: 24,
     types: new Set(),
-    durationBands: new Set(),
+    durMinH: 0, durMaxH: 12,
     party: 0,
     costBand: '',         // '', '0', '0-10', '10+'
     age: '',
@@ -39,13 +39,6 @@ function dayKeyFromDate(d) {
   if (y === 2026 && m === 7 && day === 1) return 'sat';
   if (y === 2026 && m === 7 && day === 2) return 'sun';
   return null;
-}
-
-function durationBand(minutes) {
-  if (minutes == null) return null;
-  if (minutes <= 120) return 'short';
-  if (minutes <= 240) return 'med';
-  return 'long';
 }
 
 function costBandOf(cost) {
@@ -76,7 +69,11 @@ export function buildPredicate(state, savedKeys) {
       if (g.max_players != null && g.max_players < state.party) return false;
     }
     if (state.costBand && costBandOf(g.cost) !== state.costBand) return false;
-    if (state.durationBands.size && !state.durationBands.has(durationBand(g.duration_minutes))) return false;
+    if (state.durMinH > 0 || state.durMaxH < 12) {
+      const h = (g.duration_minutes ?? 0) / 60;
+      if (h < state.durMinH) return false;
+      if (state.durMaxH < 12 && h > state.durMaxH) return false;
+    }
 
     // Sessions-aware filters: if any session passes, the group passes.
     const dayCheck = state.days.size > 0;
@@ -111,7 +108,7 @@ function matchLocation(g) {
 // Encoded form is `key=value&key=value`. Sets are comma-separated. Empty
 // values are omitted to keep URLs short.
 
-const SET_KEYS = ['days', 'types', 'durationBands', 'locations'];
+const SET_KEYS = ['days', 'types', 'locations'];
 
 export function stateToHash(state) {
   const parts = [];
@@ -121,6 +118,8 @@ export function stateToHash(state) {
   }
   if (state.hourMin > 0)  parts.push(`hMin=${state.hourMin}`);
   if (state.hourMax < 24) parts.push(`hMax=${state.hourMax}`);
+  if (state.durMinH > 0)  parts.push(`durMin=${state.durMinH}`);
+  if (state.durMaxH < 12) parts.push(`durMax=${state.durMaxH}`);
   if (state.party > 0)    parts.push(`party=${state.party}`);
   if (state.costBand)     parts.push(`cost=${state.costBand}`);
   if (state.age)          parts.push(`age=${encodeURIComponent(state.age)}`);
@@ -144,10 +143,12 @@ export function hashToState(hash) {
     const dv = decodeURIComponent(v ?? '');
     switch (k) {
       case 'q': s.search = dv; break;
-      case 'days': case 'types': case 'durationBands': case 'locations':
+      case 'days': case 'types': case 'locations':
         s[k] = new Set(dv.split(',').filter(Boolean)); break;
       case 'hMin': s.hourMin = +dv; break;
       case 'hMax': s.hourMax = +dv; break;
+      case 'durMin': s.durMinH = +dv; break;
+      case 'durMax': s.durMaxH = +dv; break;
       case 'party': s.party = +dv; break;
       case 'cost': s.costBand = dv; break;
       case 'age': s.age = dv; break;

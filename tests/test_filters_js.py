@@ -84,7 +84,6 @@ def test_roundtrip_with_filters(page):
       back: { ...back,
         days: [...back.days].sort(),
         types: [...back.types],
-        durationBands: [...back.durationBands],
         locations: [...back.locations],
       }
     });
@@ -211,3 +210,65 @@ def test_bggmatch_hash_roundtrip(page):
     obj = json.loads(_eval(page, js))
     assert "bggMatch=no" in obj["h"]
     assert obj["bggMatch"] == "no"
+
+
+def test_duration_range_keeps_in_band(page):
+    js = """
+    const s = F.defaultState();
+    s.durMinH = 2;
+    s.durMaxH = 4;
+    s.ticketsOnly = false;
+    const p = F.buildPredicate(s, new Set());
+    return JSON.stringify({
+      shortG:  p({ event_type: 'BGM', duration_minutes: 60,
+                   sessions: [{ start: '2026-07-30T09:00' }] }),
+      midG:    p({ event_type: 'BGM', duration_minutes: 180,
+                   sessions: [{ start: '2026-07-30T09:00' }] }),
+      longG:   p({ event_type: 'BGM', duration_minutes: 360,
+                   sessions: [{ start: '2026-07-30T09:00' }] }),
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["shortG"] is False
+    assert obj["midG"] is True
+    assert obj["longG"] is False
+
+
+def test_duration_max_12_means_unbounded(page):
+    """A durMaxH of 12 is the sentinel meaning 'no upper bound'."""
+    js = """
+    const s = F.defaultState();
+    s.durMinH = 0;
+    s.durMaxH = 12;
+    s.ticketsOnly = false;
+    const p = F.buildPredicate(s, new Set());
+    return p({ event_type: 'BGM', duration_minutes: 1080,
+               sessions: [{ start: '2026-07-30T09:00' }] });
+    """
+    assert _eval(page, js) is True
+
+
+def test_duration_hash_roundtrip(page):
+    js = """
+    const s = F.defaultState();
+    s.durMinH = 1.5;
+    s.durMaxH = 4;
+    const h = F.stateToHash(s);
+    const back = F.hashToState(h);
+    return JSON.stringify({ h, durMinH: back.durMinH, durMaxH: back.durMaxH });
+    """
+    obj = json.loads(_eval(page, js))
+    assert "durMin=1.5" in obj["h"]
+    assert "durMax=4" in obj["h"]
+    assert obj["durMinH"] == 1.5
+    assert obj["durMaxH"] == 4
+
+
+def test_duration_default_omitted_from_hash(page):
+    js = """
+    const s = F.defaultState();
+    return F.stateToHash(s);
+    """
+    h = _eval(page, js)
+    assert "durMin=" not in h
+    assert "durMax=" not in h

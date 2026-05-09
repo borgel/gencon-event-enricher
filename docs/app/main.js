@@ -38,10 +38,9 @@ function renderFilterRail(state, onChange) {
       <div id="f-types"></div>
     </div>
     <div class="group">
-      <div class="label">Duration</div>
-      <div id="f-durations">
-        ${[['short','≤2h'],['med','2–4h'],['long','4h+']].map(([k,l]) => `<span class="chip ${state.durationBands.has(k)?'active':''}" data-duration="${k}">${l}</span>`).join('')}
-      </div>
+      <div class="label">Duration (${formatDurH(state.durMinH)} – ${formatDurH(state.durMaxH, true)})</div>
+      <input type="range" id="f-durmin" min="0" max="12" step="0.5" value="${state.durMinH}">
+      <input type="range" id="f-durmax" min="0" max="12" step="0.5" value="${state.durMaxH}">
     </div>
     <div class="group">
       <div class="label">Party size</div>
@@ -94,6 +93,12 @@ function renderFilterRail(state, onChange) {
   wire('#f-search', 'input', (e) => state.search = e.target.value);
   wire('#f-hmin', 'input', (e) => state.hourMin = +e.target.value);
   wire('#f-hmax', 'input', (e) => state.hourMax = +e.target.value);
+  const updateDurLabel = () => {
+    const lbl = $('#f-durmin').previousElementSibling;
+    lbl.textContent = `Duration (${formatDurH(state.durMinH)} – ${formatDurH(state.durMaxH, true)})`;
+  };
+  wire('#f-durmin', 'input', (e) => { state.durMinH = +e.target.value; updateDurLabel(); });
+  wire('#f-durmax', 'input', (e) => { state.durMaxH = +e.target.value; updateDurLabel(); });
   wire('#f-party', 'input', (e) => state.party = +e.target.value || 0);
   wire('#f-cost', 'change', (e) => state.costBand = e.target.value);
   wire('#f-age', 'input', (e) => state.age = e.target.value);
@@ -114,12 +119,6 @@ function renderFilterRail(state, onChange) {
   $('#f-days').addEventListener('click', (e) => {
     const d = e.target.dataset.day; if (!d) return;
     if (state.days.has(d)) state.days.delete(d); else state.days.add(d);
-    e.target.classList.toggle('active');
-    onChange();
-  });
-  $('#f-durations').addEventListener('click', (e) => {
-    const k = e.target.dataset.duration; if (!k) return;
-    if (state.durationBands.has(k)) state.durationBands.delete(k); else state.durationBands.add(k);
     e.target.classList.toggle('active');
     onChange();
   });
@@ -230,6 +229,11 @@ function escapeAttr(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+function formatDurH(h, isMax = false) {
+  if (isMax && h >= 12) return '12h+';
+  return `${h}h`;
 }
 
 main().catch((e) => {

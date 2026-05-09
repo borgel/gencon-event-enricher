@@ -214,3 +214,21 @@ def test_bggmatch_no_filters_to_unmatched(server):
         text = page.eval_on_selector(".row", "e => e.textContent")
         assert "Cosplay" in text  # The unmatched fixture row.
         browser.close()
+
+
+def test_duration_range_inputs_render(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-durmin")
+        page.wait_for_selector("#f-durmax")
+        # Old chip group is gone
+        assert page.query_selector("#f-durations") is None
+        # Slider attributes
+        attrs = page.eval_on_selector(
+            "#f-durmin",
+            "e => ({min: e.min, max: e.max, step: e.step, val: e.value})",
+        )
+        assert attrs["min"] == "0" and attrs["max"] == "12" and attrs["step"] == "0.5"
+        browser.close()

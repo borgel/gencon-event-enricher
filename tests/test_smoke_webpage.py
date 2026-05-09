@@ -290,6 +290,42 @@ def test_lucky_button_disabled_when_empty(server):
         browser.close()
 
 
+def test_detail_open_does_not_shift_toolbar(server):
+    """Opening the detail panel must not push the results toolbar inward.
+
+    Layout regression guard: the detail panel is nested inside #results, so
+    only #results-list shares horizontal space with it; the toolbar (and the
+    Lucky button) stay put.
+    """
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_viewport_size({"width": 1400, "height": 800})
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+
+        before = page.eval_on_selector(
+            "#results-toolbar",
+            "e => { const r = e.getBoundingClientRect(); return {x: r.x, w: r.width}; }",
+        )
+        # Open detail panel
+        page.click(".row")
+        page.wait_for_function(
+            "!document.querySelector('#detail-panel').classList.contains('hidden')"
+        )
+        after = page.eval_on_selector(
+            "#results-toolbar",
+            "e => { const r = e.getBoundingClientRect(); return {x: r.x, w: r.width}; }",
+        )
+        assert before == after, f"Toolbar shifted: {before} -> {after}"
+        # And the detail panel must be a descendant of #results, not a sibling
+        is_nested = page.evaluate(
+            "() => document.querySelector('#results').contains(document.querySelector('#detail-panel'))"
+        )
+        assert is_nested is True
+        browser.close()
+
+
 def test_popstate_repopulates_type_chips(server):
     """Regression: type/location chip groups must survive Back/Forward navigation.
 

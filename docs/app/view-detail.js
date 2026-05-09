@@ -1,19 +1,17 @@
 import { bggUrl, genconUrl } from './links.js';
 import { isSaved, toggleSaved } from './saved.js';
 
-export function createDetailView({ panel, shell, onCloseToggle }) {
+export function createDetailView({ panel, onCloseToggle }) {
   panel.innerHTML = '';
 
   function close() {
     panel.classList.add('hidden');
     panel.setAttribute('aria-hidden', 'true');
-    shell.classList.remove('detail-open');
     onCloseToggle && onCloseToggle();
   }
   function open() {
     panel.classList.remove('hidden');
     panel.setAttribute('aria-hidden', 'false');
-    shell.classList.add('detail-open');
   }
 
   return {

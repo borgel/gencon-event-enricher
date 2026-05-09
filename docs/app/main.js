@@ -201,7 +201,6 @@ async function main() {
   });
   const detailView = createDetailView({
     panel: $('#detail-panel'),
-    shell: $('#app-shell'),
   });
 
   function attachLuckyHandler() {

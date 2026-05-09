@@ -160,3 +160,24 @@ def test_view_table_scroll_to_key_exists(server):
         """)
         assert result is True
         browser.close()
+
+
+def test_popstate_resyncs_toolbar(server):
+    """Navigating back/forward must update the toolbar to reflect the URL hash."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#s-key")
+        # Change sort to bgg -> toolbar and hash update via the select handler
+        page.select_option("#s-key", "bgg")
+        page.wait_for_function("window.location.hash.includes('sort=bgg')")
+        # Simulate popstate back to default (no sort params in hash) by
+        # resetting the hash and firing popstate — mirrors what the browser
+        # does when the user hits Back after a pushState-based navigation.
+        page.evaluate("history.replaceState(null, '', '#'); window.dispatchEvent(new PopStateEvent('popstate', {state: null}))")
+        page.wait_for_function("document.querySelector('#s-key').value === 'start'")
+        # Direction button label must also re-render to the start-asc default
+        dir_text = page.eval_on_selector("#s-dir", "e => e.textContent")
+        assert "Earliest" in dir_text
+        browser.close()

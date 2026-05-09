@@ -4,7 +4,7 @@ import { buildIndex, searchKeys } from './search.js';
 import { getSaved } from './saved.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
-import { defaultSortState, KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
+import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -203,6 +203,7 @@ async function main() {
   window.addEventListener('popstate', () => {
     state = hashToState(window.location.hash);
     renderFilterRail(state, applyFilters);
+    renderResultsToolbar(state, applyFilters);
     applyFilters();
   });
 

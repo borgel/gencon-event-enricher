@@ -826,3 +826,36 @@ def test_timeline_shows_out_of_window_indicators(server):
         assert result["afterMarkers"] == 1
         ctx.close()
         browser.close()
+
+
+def test_timeline_preview_blocks_unit(server):
+    """Pass a previewGroup to render() — its sessions appear as preview blocks."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-timeline.js');
+          const container = document.createElement('div');
+          document.body.appendChild(container);
+          const view = mod.createTimelineView({ container, onEventClick: () => {} });
+          const groups = [
+            { key: 'BROWSING', title: 'Dixit',
+              sessions: [
+                { gencon_id: 'D1', start: '2026-07-30T14:00:00', end: '2026-07-30T17:00:00' },
+                { gencon_id: 'D2', start: '2026-07-31T15:00:00', end: '2026-07-31T17:00:00' },
+              ] },
+          ];
+          view.render(groups, new Set(), new Set(), null, groups[0]);
+          return {
+            previews: container.querySelectorAll('.tl-preview').length,
+            saved: container.querySelectorAll('.tl-saved').length,
+          };
+        }
+        """)
+        assert result["previews"] == 2
+        assert result["saved"] == 0
+        ctx.close()
+        browser.close()

@@ -645,3 +645,41 @@ def test_clear_filters_resets_filters_preserves_sort(server):
         assert "tix=0" in h2  # because ticketsOnly is now false
         assert "sort=bgg" in h2  # sort preserved
         browser.close()
+
+
+def test_detail_view_fires_on_show_and_on_close(server):
+    """Verify createDetailView's onShow/onClose callbacks fire correctly."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Construct a fresh detail view against an isolated panel; exercise
+        # show() and the close-button click path.
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-detail.js');
+          const panel = document.createElement('aside');
+          document.body.appendChild(panel);
+          const events = [];
+          const view = mod.createDetailView({
+            panel,
+            onShow: (g) => events.push(['show', g.title]),
+            onClose: () => events.push(['close']),
+          });
+          view.show({
+            key: 'TEST', title: 'Probe Group',
+            event_type: 'BGM', event_type_label: 'BGM - Board Game',
+            min_players: 1, max_players: 4, age_required: 'Teen',
+            experience_required: 'Some',
+            duration_minutes: 60, cost: 0,
+            sessions: [{ gencon_id: 'X', start: '2026-07-30T09:00:00', end: '2026-07-30T10:00:00' }],
+          });
+          panel.querySelector('.close').click();
+          return events;
+        }
+        """)
+        assert result == [["show", "Probe Group"], ["close"]]
+        ctx.close()
+        browser.close()

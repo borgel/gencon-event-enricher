@@ -1,13 +1,14 @@
 import { bggUrl, genconUrl, googleCalendarUrl } from './links.js';
 import { isSaved, toggleSaved, isPurchased, togglePurchased } from './saved.js';
 
-export function createDetailView({ panel, onCloseToggle, onChange }) {
+export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClose }) {
   panel.innerHTML = '';
 
   function close() {
     panel.classList.add('hidden');
     panel.setAttribute('aria-hidden', 'true');
     onCloseToggle && onCloseToggle();
+    onClose && onClose();
   }
   function open() {
     panel.classList.remove('hidden');
@@ -38,6 +39,7 @@ export function createDetailView({ panel, onCloseToggle, onChange }) {
         });
       });
       open();
+      onShow && onShow(group);
     },
     hide: close,
   };

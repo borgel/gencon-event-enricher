@@ -144,3 +144,70 @@ def test_hash_omits_default_sort(page):
     h = _eval(page, js)
     assert "sort=" not in h
     assert "dir=" not in h
+
+
+def test_bggmatch_yes_keeps_only_matched(page):
+    js = """
+    const s = F.defaultState();
+    s.bggMatch = 'yes';
+    s.ticketsOnly = false;
+    const p = F.buildPredicate(s, new Set());
+    return JSON.stringify({
+      hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+      noBgg:  p({ event_type: 'BGM', bgg: null,
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["hasBgg"] is True
+    assert obj["noBgg"] is False
+
+
+def test_bggmatch_no_keeps_only_unmatched(page):
+    js = """
+    const s = F.defaultState();
+    s.bggMatch = 'no';
+    s.ticketsOnly = false;
+    const p = F.buildPredicate(s, new Set());
+    return JSON.stringify({
+      hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+      noBgg:  p({ event_type: 'BGM', bgg: null,
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["hasBgg"] is False
+    assert obj["noBgg"] is True
+
+
+def test_bggmatch_either_is_no_op(page):
+    js = """
+    const s = F.defaultState();
+    s.bggMatch = 'either';
+    s.ticketsOnly = false;
+    const p = F.buildPredicate(s, new Set());
+    return JSON.stringify({
+      hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+      noBgg:  p({ event_type: 'BGM', bgg: null,
+                  sessions: [{ start: '2026-07-30T09:00' }] }),
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["hasBgg"] is True
+    assert obj["noBgg"] is True
+
+
+def test_bggmatch_hash_roundtrip(page):
+    js = """
+    const s = F.defaultState();
+    s.bggMatch = 'no';
+    const h = F.stateToHash(s);
+    const back = F.hashToState(h);
+    return JSON.stringify({ h, bggMatch: back.bggMatch });
+    """
+    obj = json.loads(_eval(page, js))
+    assert "bggMatch=no" in obj["h"]
+    assert obj["bggMatch"] == "no"

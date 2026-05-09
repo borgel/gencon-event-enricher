@@ -2,7 +2,7 @@
 //   { search, days: Set<'thu'|'fri'|'sat'|'sun'>, hourMin, hourMax,
 //     types: Set<string>, durationBands: Set<'short'|'med'|'long'>,
 //     party, costBand, age, experience, ticketsOnly, tournament,
-//     locations: Set<string>, bggMin, hasBggOnly, savedOnly }
+//     locations: Set<string>, bggMin, bggMatch, savedOnly }
 
 import { applyHashPair as applySortHashPair, sortStateToHash } from './sort.js';
 
@@ -21,7 +21,7 @@ export function defaultState() {
     tournament: 'either', // 'either'|'yes'|'no'
     locations: new Set(),
     bggMin: 0,
-    hasBggOnly: false,
+    bggMatch: 'either',  // 'either'|'yes'|'no'
     savedOnly: false,
     sortKey: 'start',
     sortDir: 'asc',
@@ -58,7 +58,8 @@ function costBandOf(cost) {
 export function buildPredicate(state, savedKeys) {
   return (g) => {
     if (state.savedOnly && !savedKeys.has(g.key)) return false;
-    if (state.hasBggOnly && !g.bgg) return false;
+    if (state.bggMatch === 'yes' && !g.bgg) return false;
+    if (state.bggMatch === 'no'  && g.bgg)  return false;
     if (state.bggMin > 0) {
       if (!g.bgg || (g.bgg.bayesaverage ?? 0) < state.bggMin) return false;
     }
@@ -127,7 +128,7 @@ export function stateToHash(state) {
   if (!state.ticketsOnly) parts.push(`tix=0`);    // default is true → omit when on
   if (state.tournament !== 'either') parts.push(`tourn=${state.tournament}`);
   if (state.bggMin > 0)   parts.push(`bgg=${state.bggMin}`);
-  if (state.hasBggOnly)   parts.push(`bggOnly=1`);
+  if (state.bggMatch !== 'either') parts.push(`bggMatch=${state.bggMatch}`);
   if (state.savedOnly)    parts.push(`saved=1`);
   const sortFrag = sortStateToHash({ key: state.sortKey, dir: state.sortDir });
   if (sortFrag) parts.push(sortFrag);
@@ -154,7 +155,9 @@ export function hashToState(hash) {
       case 'tix': s.ticketsOnly = dv !== '0'; break;
       case 'tourn': s.tournament = dv; break;
       case 'bgg': s.bggMin = +dv; break;
-      case 'bggOnly': s.hasBggOnly = dv === '1'; break;
+      case 'bggMatch':
+        if (dv === 'yes' || dv === 'no' || dv === 'either') s.bggMatch = dv;
+        break;
       case 'saved': s.savedOnly = dv === '1'; break;
       case 'sort':
       case 'dir': {

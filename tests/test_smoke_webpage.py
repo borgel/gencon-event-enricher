@@ -181,3 +181,36 @@ def test_popstate_resyncs_toolbar(server):
         dir_text = page.eval_on_selector("#s-dir", "e => e.textContent")
         assert "Earliest" in dir_text
         browser.close()
+
+
+def test_bggmatch_chip_group_renders(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-bggmatch")
+        chips = page.eval_on_selector_all(
+            "#f-bggmatch .chip", "els => els.map(e => e.dataset.bgg)"
+        )
+        assert chips == ["either", "yes", "no"]
+        # Default is 'either' -> first chip active
+        active = page.eval_on_selector("#f-bggmatch .chip.active", "e => e.dataset.bgg")
+        assert active == "either"
+        # Old checkbox is gone
+        assert page.query_selector("#f-bggonly") is None
+        browser.close()
+
+
+def test_bggmatch_no_filters_to_unmatched(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Tickets-only is on by default, so only the SEM unmatched row + BGM
+        # matched row are present in the fixture (both have tix > 0).
+        page.click('#f-bggmatch .chip[data-bgg="no"]')
+        page.wait_for_function("document.querySelectorAll('.row').length === 1")
+        text = page.eval_on_selector(".row", "e => e.textContent")
+        assert "Cosplay" in text  # The unmatched fixture row.
+        browser.close()

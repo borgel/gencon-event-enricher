@@ -73,9 +73,18 @@ function renderFilterRail(state, onChange) {
       <input type="range" id="f-bgg" min="0" max="9" step="0.1" value="${state.bggMin}">
     </div>
     <div class="group">
+      <div class="label">BGG match</div>
+      <div id="f-bggmatch">
+        ${['either','yes','no'].map(v =>
+          `<span class="chip ${state.bggMatch===v?'active':''}" data-bgg="${v}">${
+            v==='either'?'Any': v==='yes'?'Has match':'No match'
+          }</span>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="group">
       <label><input type="checkbox" id="f-tix" ${state.ticketsOnly?'checked':''}> Tickets available</label><br>
       <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label><br>
-      <label><input type="checkbox" id="f-bggonly" ${state.hasBggOnly?'checked':''}> Has BGG match</label><br>
       <label><input type="checkbox" id="f-saved" ${state.savedOnly?'checked':''}> Saved only</label>
     </div>
   `;
@@ -92,9 +101,16 @@ function renderFilterRail(state, onChange) {
   wire('#f-bgg', 'input', (e) => state.bggMin = +e.target.value);
   wire('#f-tix', 'change', (e) => state.ticketsOnly = e.target.checked);
   wire('#f-tournament', 'change', (e) => state.tournament = e.target.checked ? 'yes' : 'either');
-  wire('#f-bggonly', 'change', (e) => state.hasBggOnly = e.target.checked);
   wire('#f-saved', 'change', (e) => state.savedOnly = e.target.checked);
 
+  $('#f-bggmatch').addEventListener('click', (e) => {
+    const v = e.target.dataset.bgg; if (!v) return;
+    state.bggMatch = v;
+    for (const chip of document.querySelectorAll('#f-bggmatch .chip')) {
+      chip.classList.toggle('active', chip.dataset.bgg === v);
+    }
+    onChange();
+  });
   $('#f-days').addEventListener('click', (e) => {
     const d = e.target.dataset.day; if (!d) return;
     if (state.days.has(d)) state.days.delete(d); else state.days.add(d);

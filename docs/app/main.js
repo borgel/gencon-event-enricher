@@ -8,6 +8,7 @@ import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
+let lastVisibleGroups = [];
 
 function renderHeaderMeta(meta) {
   const m = meta || {};
@@ -135,7 +136,9 @@ function renderResultsToolbar(state, onChange) {
       </select>
       <button id="s-dir" type="button">${LABELS[state.sortKey][state.sortDir]}</button>
     </div>
-    <div class="toolbar-right"></div>
+    <div class="toolbar-right">
+      <button id="s-lucky" type="button" disabled>🎲 I'm Feeling Lucky</button>
+    </div>
   `;
   document.querySelector('#results-toolbar').innerHTML = html;
 
@@ -209,7 +212,17 @@ async function main() {
     shell: $('#app-shell'),
   });
 
+  function attachLuckyHandler() {
+    document.querySelector('#s-lucky').addEventListener('click', () => {
+      if (!lastVisibleGroups.length) return;
+      const g = lastVisibleGroups[Math.floor(Math.random() * lastVisibleGroups.length)];
+      detailView.show(g);
+      tableView.scrollToKey(g.key);
+      tableView.setSelectedKey(g.key);
+    });
+  }
   renderResultsToolbar(state, applyFilters);
+  attachLuckyHandler();
 
   function applyFilters() {
     const saved = getSaved();
@@ -218,6 +231,9 @@ async function main() {
     const hits = searchKeys(index, state.search);
     if (hits) visible = visible.filter(g => hits.has(g.key));
     visible.sort(compareGroups({ key: state.sortKey, dir: state.sortDir }));
+    lastVisibleGroups = visible;
+    const lucky = document.querySelector('#s-lucky');
+    if (lucky) lucky.disabled = visible.length === 0;
     tableView.setRows(visible);
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +
@@ -231,6 +247,7 @@ async function main() {
     state = hashToState(window.location.hash);
     renderFilterRail(state, applyFilters);
     renderResultsToolbar(state, applyFilters);
+    attachLuckyHandler();
     applyFilters();
   });
 

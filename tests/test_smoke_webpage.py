@@ -253,3 +253,38 @@ def test_type_chip_shows_label_and_abbrev(server):
             '#f-types .chip[data-val="BGM"]', "e => e.dataset.val"
         ) == "BGM"
         browser.close()
+
+
+def test_lucky_button_opens_detail_panel(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#s-lucky")
+        # Sanity: panel is hidden initially
+        panel_class = page.eval_on_selector("#detail-panel", "e => e.className")
+        assert "hidden" in panel_class
+        # Click lucky -> panel opens with one of the fixture groups
+        page.click("#s-lucky")
+        page.wait_for_function(
+            "!document.querySelector('#detail-panel').classList.contains('hidden')"
+        )
+        text = page.inner_text("#detail-panel")
+        assert "Wingspan" in text or "Cosplay" in text
+        browser.close()
+
+
+def test_lucky_button_disabled_when_empty(server):
+    """Filter to nothing, button should be disabled."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # bggMatch=yes + savedOnly drops everything (nothing saved by default
+        # and only one BGM has BGG; saved-only kills it).
+        page.click("#f-saved")
+        page.wait_for_function("document.querySelectorAll('.row').length === 0")
+        disabled = page.eval_on_selector("#s-lucky", "e => e.disabled")
+        assert disabled is True
+        browser.close()

@@ -3,6 +3,7 @@ import { isSaved, toggleSaved, isPurchased, togglePurchased } from './saved.js';
 
 export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClose }) {
   panel.innerHTML = '';
+  let currentOverlapInfo = null;
 
   function close() {
     panel.classList.add('hidden');
@@ -17,8 +18,9 @@ export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClo
   const fireChange = () => { onChange && onChange(); };
 
   return {
-    show(group) {
-      panel.innerHTML = render(group);
+    show(group, overlapInfoMap) {
+      currentOverlapInfo = overlapInfoMap || null;
+      panel.innerHTML = render(group, currentOverlapInfo);
       panel.querySelector('.close').addEventListener('click', close);
       // Wire per-session toggles. Each .session-card carries its session id
       // in data-session-id; saved/purchased state is keyed on that.
@@ -45,7 +47,7 @@ export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClo
   };
 }
 
-function render(g) {
+function render(g, perSessionOverlap) {
   return `
     <span class="close" title="Close detail">✕</span>
     <h2>${escape(g.title)}</h2>
@@ -55,7 +57,7 @@ function render(g) {
     <h3 style="margin-top:14px;font-size:14px">Description</h3>
     <p>${escape(g.long_description || g.short_description)}</p>
     <h3 style="margin-top:14px;font-size:14px">Sessions (${g.sessions.length})</h3>
-    ${g.sessions.map(s => sessionCard(s, g)).join('')}
+    ${g.sessions.map(s => sessionCard(s, g, perSessionOverlap?.get(s.gencon_id))).join('')}
   `;
 }
 
@@ -101,7 +103,7 @@ function categoryRank(ranks) {
   return ` · #${entry[1]} ${entry[0]}`;
 }
 
-function sessionCard(s, g) {
+function sessionCard(s, g, overlapInfo) {
   const start = new Date(s.start);
   const end = s.end ? new Date(s.end) : null;
   const saved = isSaved(s.gencon_id);
@@ -113,6 +115,10 @@ function sessionCard(s, g) {
   const tix = s.tickets_available ?? '—';
   const round = s.total_rounds && s.total_rounds > 1
     ? ` · Round ${s.round_number || '?'}/${s.total_rounds}` : '';
+  const fitText = overlapInfo && !overlapInfo.fits && overlapInfo.conflictsWith.length
+    ? `⚠️ Conflicts with ${escape(overlapInfo.conflictsWith[0].title)}`
+    : '✓ Fits your schedule';
+  const fitClass = overlapInfo && !overlapInfo.fits ? 'session-fit conflict' : 'session-fit';
   return `
     <div class="session-card" data-session-id="${escape(s.gencon_id)}">
       <div class="session-when">${formatDay(start)} ${formatTime(start)}${end ? '–' + formatTime(end) : ''}</div>
@@ -120,6 +126,7 @@ function sessionCard(s, g) {
       <div class="session-meta">
         ${s.gm ? `GM: ${escape(s.gm)} · ` : ''}${tix} tickets${round}
       </div>
+      <div class="${fitClass}">${fitText}</div>
       <div class="session-actions">
         <button class="save-toggle ${saved ? 'starred' : ''}">${saved ? '★ Saved' : '☆ Save'}</button>
         <label class="purchased-toggle">

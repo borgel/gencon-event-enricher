@@ -6,6 +6,7 @@ import { exportSchedule, parseScheduleCSV, triggerDownload } from './schedule.js
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
+import { groupOverlapMap } from './conflict.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -194,6 +195,8 @@ async function main() {
 
   let state = hashToState(window.location.hash);
   const index = buildIndex(blob.groups);
+  let openGroup = null;
+  let latestOverlap = { conflictedGroups: new Set(), perSession: new Map() };
 
   // Build a "Full Label (CODE)" map from the dataset. event_type_label in
   // GenCon data is formatted "CODE - Full Label" — strip the "CODE - " prefix.
@@ -211,18 +214,23 @@ async function main() {
 
   const tableView = createTableView({
     container: $('#results-list'),
-    onRowClick: (key) => detailView.show(groupsByKey.get(key)),
+    onRowClick: (key) => {
+      const g = groupsByKey.get(key);
+      detailView.show(g, latestOverlap.perSession);
+    },
   });
   const detailView = createDetailView({
     panel: $('#detail-panel'),
     onChange: () => applyFilters(),
+    onShow: (g) => { openGroup = g; },
+    onClose: () => { openGroup = null; },
   });
 
   function attachLuckyHandler() {
     document.querySelector('#s-lucky').addEventListener('click', () => {
       if (!lastVisibleGroups.length) return;
       const g = lastVisibleGroups[Math.floor(Math.random() * lastVisibleGroups.length)];
-      detailView.show(g);
+      detailView.show(g, latestOverlap.perSession);
       tableView.scrollToKey(g.key);
       tableView.setSelectedKey(g.key);
     });
@@ -316,6 +324,11 @@ async function main() {
   function applyFilters() {
     const saved = getSaved();
     const purchased = getPurchased();
+    const overlapInfo = groupOverlapMap(blob.groups, saved, purchased);
+    latestOverlap = overlapInfo;
+    if (openGroup) {
+      detailView.show(openGroup, overlapInfo.perSession);
+    }
     const pred = buildPredicate(state, saved);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);

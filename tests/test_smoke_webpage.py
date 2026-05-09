@@ -683,3 +683,21 @@ def test_detail_view_fires_on_show_and_on_close(server):
         assert result == [["show", "Probe Group"], ["close"]]
         ctx.close()
         browser.close()
+
+
+def test_session_card_fit_line_renders(server):
+    """The session card always shows a fit-status line (✓ or ⚠️)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click(".row")
+        page.wait_for_selector("#detail-panel .session-card .session-fit")
+        text = page.eval_on_selector(
+            "#detail-panel .session-card .session-fit", "e => e.textContent"
+        )
+        assert "Fits" in text or "Conflicts" in text
+        ctx.close()
+        browser.close()

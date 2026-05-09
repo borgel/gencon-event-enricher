@@ -143,3 +143,112 @@ def test_assign_tracks_chain_reuse(page):
     """
     obj = _eval(page, js)
     assert obj == {"A": 0, "B": 1, "C": 0}
+
+
+def _fixture_groups():
+    return [
+        {
+            "key": "G1", "title": "Wingspan",
+            "sessions": [
+                {"gencon_id": "BGM26ND000001", "start": "2026-07-30T09:00:00", "end": "2026-07-30T13:00:00"},
+            ],
+        },
+        {
+            "key": "G2", "title": "Pathfinder Society",
+            "sessions": [
+                {"gencon_id": "RPG26ND000010", "start": "2026-08-01T10:00:00", "end": "2026-08-01T13:00:00"},
+            ],
+        },
+        {
+            "key": "G3", "title": "Catan Tournament",
+            "sessions": [
+                {"gencon_id": "BGM26ND000020", "start": "2026-08-01T11:00:00", "end": "2026-08-01T13:00:00"},
+            ],
+        },
+    ]
+
+
+def test_group_overlap_map_empty_when_nothing_saved(page):
+    js = f"""
+    const groups = {json.dumps(_fixture_groups())};
+    const out = C.groupOverlapMap(groups, new Set(), new Set());
+    return JSON.stringify({{
+      conflictedGroups: [...out.conflictedGroups],
+      perSessionSize: out.perSession.size,
+    }});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["conflictedGroups"] == []
+    assert obj["perSessionSize"] == 0
+
+
+def test_group_overlap_map_saved_pair_conflicts(page):
+    """G2 (Pathfinder 10–13) and G3 (Catan 11–13) on Aug 1 → both conflict."""
+    js = f"""
+    const groups = {json.dumps(_fixture_groups())};
+    const saved = new Set(['RPG26ND000010', 'BGM26ND000020']);
+    const out = C.groupOverlapMap(groups, saved, new Set());
+    const ps = {{}};
+    for (const [sid, info] of out.perSession) {{
+      ps[sid] = {{
+        fits: info.fits,
+        conflictsWith: info.conflictsWith.map(c => c.title).sort(),
+      }};
+    }}
+    return JSON.stringify({{
+      conflictedGroups: [...out.conflictedGroups].sort(),
+      perSession: ps,
+    }});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["conflictedGroups"] == ["G2", "G3"]
+    assert obj["perSession"]["RPG26ND000010"]["fits"] is False
+    assert obj["perSession"]["RPG26ND000010"]["conflictsWith"] == ["Catan Tournament"]
+    assert obj["perSession"]["BGM26ND000020"]["fits"] is False
+    assert obj["perSession"]["BGM26ND000020"]["conflictsWith"] == ["Pathfinder Society"]
+
+
+def test_group_overlap_map_purchased_counts(page):
+    """Purchased sessions count for conflict purposes alongside saved."""
+    js = f"""
+    const groups = {json.dumps(_fixture_groups())};
+    // RPG saved, BGM purchased — they still conflict.
+    const out = C.groupOverlapMap(groups, new Set(['RPG26ND000010']), new Set(['BGM26ND000020']));
+    return JSON.stringify({{ conflictedGroups: [...out.conflictedGroups].sort() }});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["conflictedGroups"] == ["G2", "G3"]
+
+
+def test_group_overlap_map_saved_session_with_unsaved_sibling(page):
+    """If a group has multiple sessions but only one is saved, the unsaved
+    sibling is not listed as a conflict (only saved/purchased participate)."""
+    js = """
+    const groups = [
+      {
+        key: 'G1', title: 'Wingspan',
+        sessions: [
+          { gencon_id: 'A', start: '2026-07-30T09:00:00', end: '2026-07-30T11:00:00' },
+          { gencon_id: 'B', start: '2026-07-30T10:00:00', end: '2026-07-30T12:00:00' },
+        ],
+      },
+    ];
+    // Save only A. B is in the same group but unsaved → no conflict reported.
+    const out = C.groupOverlapMap(groups, new Set(['A']), new Set());
+    return JSON.stringify({ conflictedGroups: [...out.conflictedGroups] });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["conflictedGroups"] == []
+
+
+def test_group_overlap_map_session_fits_when_no_conflict(page):
+    js = f"""
+    const groups = {json.dumps(_fixture_groups())};
+    // Save only G1 — no conflict with anything else.
+    const out = C.groupOverlapMap(groups, new Set(['BGM26ND000001']), new Set());
+    const info = out.perSession.get('BGM26ND000001');
+    return JSON.stringify({{ fits: info.fits, conflictsWith: info.conflictsWith }});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["fits"] is True
+    assert obj["conflictsWith"] == []

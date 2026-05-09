@@ -794,3 +794,35 @@ def test_timeline_lanes_for_conflict(server):
         assert result["dayWidth"] == "280px"
         ctx.close()
         browser.close()
+
+
+def test_timeline_shows_out_of_window_indicators(server):
+    """Sessions starting before 8a or ending after midnight render with ←/→."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-timeline.js');
+          const container = document.createElement('div');
+          document.body.appendChild(container);
+          const view = mod.createTimelineView({ container, onEventClick: () => {} });
+          const groups = [
+            { key: 'EARLY', title: 'Pre-dawn Tournament',
+              sessions: [{ gencon_id: 'A', start: '2026-07-30T06:00:00', end: '2026-07-30T10:00:00' }] },
+            { key: 'LATE', title: 'Midnight Madness',
+              sessions: [{ gencon_id: 'B', start: '2026-07-30T22:00:00', end: '2026-07-31T02:00:00' }] },
+          ];
+          view.render(groups, new Set(['A', 'B']), new Set(), null, null);
+          return {
+            beforeMarkers: container.querySelectorAll('.tl-out.before').length,
+            afterMarkers: container.querySelectorAll('.tl-out.after').length,
+          };
+        }
+        """)
+        assert result["beforeMarkers"] == 1
+        assert result["afterMarkers"] == 1
+        ctx.close()
+        browser.close()

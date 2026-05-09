@@ -757,3 +757,40 @@ def test_timeline_renders_saved_and_purchased(server):
         assert result["days"] == 2
         ctx.close()
         browser.close()
+
+
+def test_timeline_lanes_for_conflict(server):
+    """Two overlapping sessions on the same day render in separate tracks
+    and the day column widens to fit them."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        result = page.evaluate("""
+        async () => {
+          const mod = await import('/app/view-timeline.js');
+          const container = document.createElement('div');
+          document.body.appendChild(container);
+          const view = mod.createTimelineView({ container, onEventClick: () => {} });
+          const groups = [
+            { key: 'G1', title: 'Pathfinder',
+              sessions: [{ gencon_id: 'A', start: '2026-07-30T10:00:00', end: '2026-07-30T13:00:00' }] },
+            { key: 'G2', title: 'Catan',
+              sessions: [{ gencon_id: 'B', start: '2026-07-30T11:00:00', end: '2026-07-30T13:00:00' }] },
+          ];
+          view.render(groups, new Set(['A', 'B']), new Set(),
+                      new Set(['A', 'B']), null);
+          const blocks = [...container.querySelectorAll('.tl-event')]
+            .map(e => e.style.width);
+          const dayWidth = container.querySelector('.tl-day').style.width;
+          const conflictBlocks = container.querySelectorAll('.tl-event.tl-conflict').length;
+          return { blocks, dayWidth, conflictBlocks };
+        }
+        """)
+        assert result["conflictBlocks"] == 2
+        assert "calc(50% - 2px)" in result["blocks"][0]
+        # Column width = 2 tracks × 140px = 280px
+        assert result["dayWidth"] == "280px"
+        ctx.close()
+        browser.close()

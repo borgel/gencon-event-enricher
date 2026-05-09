@@ -153,11 +153,12 @@ function renderResultsToolbar(state, onChange) {
   });
 }
 
-function populateMultiselect(id, values, set, onChange) {
+function populateMultiselect(id, values, set, onChange, labels = {}) {
   const target = document.getElementById(id);
-  target.innerHTML = values.map(v =>
-    `<span class="chip ${set.has(v)?'active':''}" data-val="${escapeAttr(v)}">${escapeAttr(v)}</span>`
-  ).join('');
+  target.innerHTML = values.map(v => {
+    const text = labels[v] || v;
+    return `<span class="chip ${set.has(v)?'active':''}" data-val="${escapeAttr(v)}">${escapeAttr(text)}</span>`;
+  }).join('');
   target.addEventListener('click', (e) => {
     const v = e.target.dataset.val; if (!v) return;
     if (set.has(v)) set.delete(v); else set.add(v);
@@ -175,11 +176,22 @@ async function main() {
   const index = buildIndex(blob.groups);
 
   renderFilterRail(state, applyFilters);
+  // Build a "Full Label (CODE)" map from the dataset. event_type_label in
+  // GenCon data is formatted "CODE - Full Label" — strip the "CODE - " prefix.
+  const typeLabels = {};
+  for (const g of blob.groups) {
+    if (typeLabels[g.event_type]) continue;
+    const raw = g.event_type_label || g.event_type;
+    const m = raw.match(/^[A-Z]+\s*-\s*(.+)$/);
+    const human = (m ? m[1] : raw).trim();
+    typeLabels[g.event_type] = `${human} (${g.event_type})`;
+  }
   populateMultiselect(
     'f-types',
     [...new Set(blob.groups.map(g => g.event_type))].sort(),
     state.types,
     applyFilters,
+    typeLabels,
   );
   populateMultiselect(
     'f-locations',

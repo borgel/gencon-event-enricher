@@ -232,3 +232,24 @@ def test_duration_range_inputs_render(server):
         )
         assert attrs["min"] == "0" and attrs["max"] == "12" and attrs["step"] == "0.5"
         browser.close()
+
+
+def test_type_chip_shows_label_and_abbrev(server):
+    """Type chips display 'Full Label (CODE)', not just the code."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector('#f-types .chip[data-val="BGM"]')
+        text = page.eval_on_selector(
+            '#f-types .chip[data-val="BGM"]', "e => e.textContent.trim()"
+        )
+        # Fixture's event_type_label for BGM is "BGM - Board Game"; we strip the
+        # "CODE - " prefix to derive the human label.
+        assert "Board Game" in text
+        assert "(BGM)" in text
+        # data-val (used by the predicate) remains the bare code
+        assert page.eval_on_selector(
+            '#f-types .chip[data-val="BGM"]', "e => e.dataset.val"
+        ) == "BGM"
+        browser.close()

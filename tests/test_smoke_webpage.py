@@ -97,7 +97,10 @@ def test_page_loads_and_lists_groups(server):
         rows = page.query_selector_all(".row")
         assert len(rows) >= 2
 
-        # Type filter to BGM only -> 1 row
+        # Type filter to BGM only -> 1 row.
+        # Strict-types semantics: defaults to all selected, so we Clear all
+        # first, then click BGM to narrow to BGM only.
+        page.click("#f-types-none")
         page.click('span.chip[data-val="BGM"]')
         page.wait_for_function("document.querySelectorAll('.row').length === 1")
 
@@ -411,6 +414,46 @@ def test_row_marks_show_saved_and_purchased(server):
         browser.close()
 
 
+def test_type_chips_all_active_by_default(server):
+    """Page loads with every type chip active (strict-types default)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector('#f-types .chip')
+        all_count = page.eval_on_selector_all("#f-types .chip", "els => els.length")
+        active_count = page.eval_on_selector_all(
+            "#f-types .chip.active", "els => els.length"
+        )
+        assert all_count == active_count and all_count > 0
+        ctx.close()
+        browser.close()
+
+
+def test_type_clear_all_then_select_all(server):
+    """Clear all -> 0 rows visible. Select all -> rows back."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        before_rows = page.eval_on_selector_all(".row", "els => els.length")
+        assert before_rows >= 1
+        page.click("#f-types-none")
+        page.wait_for_function("document.querySelectorAll('.row').length === 0")
+        # Every chip is now inactive.
+        active = page.eval_on_selector_all("#f-types .chip.active", "els => els.length")
+        assert active == 0
+        page.click("#f-types-all")
+        page.wait_for_function(
+            f"document.querySelectorAll('.row').length === {before_rows}"
+        )
+        ctx.close()
+        browser.close()
+
+
 def test_schedule_export_downloads_csv(server):
     """The Export schedule button triggers a CSV download with marked sessions."""
     with sync_playwright() as p:
@@ -540,7 +583,8 @@ def test_popstate_repopulates_type_chips(server):
         page = browser.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector('#f-types .chip[data-val="BGM"]')
-        # Toggle a type to push hash state.
+        # Set non-default state: clear all, then activate BGM.
+        page.click("#f-types-none")
         page.click('#f-types .chip[data-val="BGM"]')
         page.wait_for_function("window.location.hash.includes('types=BGM')")
         # Simulate Back navigation: clear hash, fire popstate.
@@ -555,11 +599,11 @@ def test_popstate_repopulates_type_chips(server):
         page.wait_for_function(
             "document.querySelectorAll('#f-types .chip').length > 0"
         )
-        # And no chip should be active (since hash is empty).
-        active = page.eval_on_selector_all(
-            "#f-types .chip.active", "els => els.length"
-        )
-        assert active == 0
+        # And every chip should be active (default = all selected after popstate
+        # with empty hash).
+        all_count = page.eval_on_selector_all("#f-types .chip", "els => els.length")
+        active = page.eval_on_selector_all("#f-types .chip.active", "els => els.length")
+        assert active == all_count and all_count > 0
         browser.close()
 
 
@@ -570,7 +614,8 @@ def test_clear_filters_resets_filters_preserves_sort(server):
         page = browser.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")
-        # Set non-default state: pick a type, switch sort to BGG-desc.
+        # Set non-default state: clear types, activate BGM only, switch sort.
+        page.click("#f-types-none")
         page.click('#f-types .chip[data-val="BGM"]')
         page.wait_for_function("document.querySelectorAll('.row').length === 1")
         page.select_option("#s-key", "bgg")
@@ -584,18 +629,19 @@ def test_clear_filters_resets_filters_preserves_sort(server):
 
         # Both fixture rows visible again.
         page.wait_for_function("document.querySelectorAll('.row').length === 2")
-        # ticketsOnly is now unchecked (Q1=C — clear flips it off, even though
+        # ticketsOnly is now unchecked (clear flips it off, even though
         # it defaults to true on first load).
         tix = page.eval_on_selector("#f-tix", "e => e.checked")
         assert tix is False
-        # Type chip no longer active.
+        # All type chips active again (clear restores the all-selected default).
+        all_count = page.eval_on_selector_all("#f-types .chip", "els => els.length")
         active_types = page.eval_on_selector_all(
             "#f-types .chip.active", "els => els.length"
         )
-        assert active_types == 0
-        # Hash no longer carries filter keys, but sort is preserved.
+        assert active_types == all_count and all_count > 0
+        # Hash carries sort but not the narrowed types filter.
         h2 = page.evaluate("() => window.location.hash")
-        assert "types=" not in h2
+        assert "types=BGM" not in h2
         assert "tix=0" in h2  # because ticketsOnly is now false
         assert "sort=bgg" in h2  # sort preserved
         browser.close()

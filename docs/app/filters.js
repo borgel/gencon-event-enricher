@@ -56,7 +56,11 @@ export function buildPredicate(state, savedKeys) {
     if (state.bggMin > 0) {
       if (!g.bgg || (g.bgg.bayesaverage ?? 0) < state.bggMin) return false;
     }
-    if (state.types.size && !state.types.has(g.event_type)) return false;
+    // Strict: an event must match the type filter. The UI defaults state.types
+    // to every known type, so an "empty" types set means the user explicitly
+    // chose Clear all and wants nothing. This contrasts with most other
+    // multi-select filters where empty = no constraint.
+    if (!state.types.has(g.event_type)) return false;
     if (state.locations.size && !state.locations.has(matchLocation(g))) return false;
     if (state.tournament !== 'either') {
       const want = state.tournament === 'yes';
@@ -110,11 +114,19 @@ function matchLocation(g) {
 
 const SET_KEYS = ['days', 'types', 'locations'];
 
-export function stateToHash(state) {
+// `options.allTypes` (optional) is the full set of event types in the dataset.
+// When state.types contains every entry, the `types=` fragment is omitted to
+// keep URLs short for the common "all selected" default.
+export function stateToHash(state, options = {}) {
   const parts = [];
   if (state.search) parts.push(`q=${encodeURIComponent(state.search)}`);
   for (const k of SET_KEYS) {
-    if (state[k].size) parts.push(`${k}=${[...state[k]].join(',')}`);
+    if (!state[k].size) continue;
+    if (k === 'types' && options.allTypes && state.types.size === options.allTypes.length
+        && options.allTypes.every(t => state.types.has(t))) {
+      continue;
+    }
+    parts.push(`${k}=${[...state[k]].join(',')}`);
   }
   if (state.hourMin > 0)  parts.push(`hMin=${state.hourMin}`);
   if (state.hourMax < 24) parts.push(`hMax=${state.hourMax}`);

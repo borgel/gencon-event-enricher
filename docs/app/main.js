@@ -37,6 +37,10 @@ function renderFilterRail(state, onChange) {
     </div>
     <div class="group">
       <div class="label">Type (multi)</div>
+      <div class="multiselect-controls">
+        <button id="f-types-all" type="button">Select all</button>
+        <button id="f-types-none" type="button">Clear all</button>
+      </div>
       <div id="f-types"></div>
     </div>
     <div class="group">
@@ -262,6 +266,7 @@ async function main() {
         sortKey: state.sortKey,
         sortDir: state.sortDir,
       };
+      ensureDefaultTypes();
       renderAllFilterUI();
       applyFilters();
     });
@@ -279,9 +284,34 @@ async function main() {
     attachLuckyHandler();
     attachClearHandler();
     attachScheduleHandlers();
+    attachTypeBulkHandlers();
   }
 
-  renderAllFilterUI();
+  function attachTypeBulkHandlers() {
+    // NOTE: mutate state.types in place rather than reassigning. The chip
+    // click handler (set up by populateMultiselect) closes over the Set
+    // reference passed to it; reassigning state.types here would leave
+    // those closures pointing at an orphan Set.
+    document.querySelector('#f-types-all').addEventListener('click', () => {
+      state.types.clear();
+      for (const t of uniqueTypes) state.types.add(t);
+      for (const c of document.querySelectorAll('#f-types .chip')) c.classList.add('active');
+      applyFilters();
+    });
+    document.querySelector('#f-types-none').addEventListener('click', () => {
+      state.types.clear();
+      for (const c of document.querySelectorAll('#f-types .chip')) c.classList.remove('active');
+      applyFilters();
+    });
+  }
+
+  // Strict-types semantics: an empty state.types means "show no events".
+  // On initial load (or after Clear filters / popstate without explicit
+  // types= in the hash), populate state.types with every known type so the
+  // user starts with everything visible.
+  function ensureDefaultTypes() {
+    if (state.types.size === 0) state.types = new Set(uniqueTypes);
+  }
 
   function applyFilters() {
     const saved = getSaved();
@@ -304,16 +334,19 @@ async function main() {
       `${visible.length.toLocaleString()} groups visible · ` +
       `${blob.meta.stats.matched.toLocaleString()} matched / ` +
       `${blob.meta.stats.unmatched.toLocaleString()} unmatched in dataset`;
-    const hash = stateToHash(state);
+    const hash = stateToHash(state, { allTypes: uniqueTypes });
     history.replaceState(null, '', hash ? `#${hash}` : '#');
   }
 
   window.addEventListener('popstate', () => {
     state = hashToState(window.location.hash);
+    ensureDefaultTypes();
     renderAllFilterUI();
     applyFilters();
   });
 
+  ensureDefaultTypes();
+  renderAllFilterUI();
   applyFilters();
 }
 

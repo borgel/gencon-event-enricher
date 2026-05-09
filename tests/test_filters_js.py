@@ -150,6 +150,7 @@ def test_bggmatch_yes_keeps_only_matched(page):
     const s = F.defaultState();
     s.bggMatch = 'yes';
     s.ticketsOnly = false;
+    s.types = new Set(['BGM']);  // strict-types semantics: must include test event's type
     const p = F.buildPredicate(s, new Set());
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
@@ -168,6 +169,7 @@ def test_bggmatch_no_keeps_only_unmatched(page):
     const s = F.defaultState();
     s.bggMatch = 'no';
     s.ticketsOnly = false;
+    s.types = new Set(['BGM']);
     const p = F.buildPredicate(s, new Set());
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
@@ -186,6 +188,7 @@ def test_bggmatch_either_is_no_op(page):
     const s = F.defaultState();
     s.bggMatch = 'either';
     s.ticketsOnly = false;
+    s.types = new Set(['BGM']);
     const p = F.buildPredicate(s, new Set());
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
@@ -218,6 +221,7 @@ def test_duration_range_keeps_in_band(page):
     s.durMinH = 2;
     s.durMaxH = 4;
     s.ticketsOnly = false;
+    s.types = new Set(['BGM']);
     const p = F.buildPredicate(s, new Set());
     return JSON.stringify({
       shortG:  p({ event_type: 'BGM', duration_minutes: 60,
@@ -241,6 +245,7 @@ def test_duration_max_12_means_unbounded(page):
     s.durMinH = 0;
     s.durMaxH = 12;
     s.ticketsOnly = false;
+    s.types = new Set(['BGM']);
     const p = F.buildPredicate(s, new Set());
     return p({ event_type: 'BGM', duration_minutes: 1080,
                sessions: [{ start: '2026-07-30T09:00' }] });

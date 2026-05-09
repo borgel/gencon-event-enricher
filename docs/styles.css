@@ -44,6 +44,13 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   border: 1px solid var(--border); background: #fff; border-radius: 10px;
   cursor: pointer; user-select: none; }
 .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.multiselect-controls { display: flex; gap: 4px; margin-bottom: 4px; }
+.multiselect-controls button {
+  font: inherit; padding: 1px 6px; font-size: 11px;
+  border: 1px solid var(--border); background: #fff; border-radius: 3px;
+  cursor: pointer;
+}
+.multiselect-controls button:hover { background: #f0f0f0; }
 
 #results { overflow: hidden; display: flex; flex-direction: column; }
 #results-summary {

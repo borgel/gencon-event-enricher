@@ -39,6 +39,7 @@ function render(g) {
     <div style="margin: 6px 0;">
       <button class="save-toggle ${saved ? 'starred' : ''}">${saved ? '★ Saved' : '☆ Save'}</button>
     </div>
+    ${signupRow(g)}
     ${g.bgg ? bggCard(g.bgg) : '<div class="meta" style="font-style:italic">No BGG match.</div>'}
     <h3 style="margin-top:14px;font-size:14px">Description</h3>
     <p>${escape(g.long_description || g.short_description)}</p>
@@ -47,6 +48,24 @@ function render(g) {
       <thead><tr><th>When</th><th>Where</th><th>GM</th><th>Tix</th><th>Round</th><th></th></tr></thead>
       <tbody>${g.sessions.map(sessionRow).join('')}</tbody>
     </table>
+  `;
+}
+
+function signupRow(g) {
+  if (!g.sessions?.length) return '';
+  const buttons = g.sessions.map(s => {
+    const url = genconUrl(s.gencon_id);
+    if (!url) return '';
+    const start = new Date(s.start);
+    const label = `${formatDay(start)} ${formatTime(start)}`;
+    return `<a class="signup-btn" href="${url}" target="_blank" rel="noopener">${escape(label)} ↗</a>`;
+  }).filter(Boolean).join('');
+  if (!buttons) return '';
+  return `
+    <div class="signup-row">
+      <span class="signup-label">Sign up:</span>
+      ${buttons}
+    </div>
   `;
 }
 

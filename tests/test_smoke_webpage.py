@@ -115,6 +115,17 @@ def test_page_loads_and_lists_groups(server):
         )
         # Fixture's gencon_id is BGM26ND000001 → trailing digits 000001
         assert href == "https://www.gencon.com/events/000001"
+
+        # Prominent sign-up button row near the top of the panel: one button
+        # per session, each labeled with day/time and pointing at the same
+        # direct event URL.
+        btns = page.eval_on_selector_all(
+            "#detail-panel .signup-row .signup-btn",
+            "els => els.map(e => ({text: e.textContent.trim(), href: e.href}))",
+        )
+        assert len(btns) == 1
+        assert "Thu" in btns[0]["text"]  # fixture session starts 2026-07-30 (Thu)
+        assert btns[0]["href"] == "https://www.gencon.com/events/000001"
         browser.close()
 
 

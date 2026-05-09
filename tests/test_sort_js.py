@@ -91,3 +91,85 @@ def test_labels_have_all_combinations(page):
 def test_key_options_shape(page):
     opts = json.loads(_eval(page, "return JSON.stringify(S.KEY_OPTIONS)"))
     assert opts == [["start", "Start time"], ["type", "Event type"], ["bgg", "BGG rating"]]
+
+
+def _fixture_groups():
+    """Four groups for comparator tests. Two have BGG, two don't."""
+    return [
+        {
+            "key": "a",
+            "event_type_label": "Board Game",
+            "sessions": [{"start": "2026-07-31T10:00:00"}],
+            "bgg": {"bayesaverage": 7.5},
+        },
+        {
+            "key": "b",
+            "event_type_label": "RPG",
+            "sessions": [{"start": "2026-07-30T09:00:00"}],
+            "bgg": None,
+        },
+        {
+            "key": "c",
+            "event_type_label": "Board Game",
+            "sessions": [{"start": "2026-07-30T15:00:00"}],
+            "bgg": {"bayesaverage": 8.2},
+        },
+        {
+            "key": "d",
+            "event_type_label": "Seminar",
+            "sessions": [{"start": "2026-08-01T12:00:00"}],
+            "bgg": None,
+        },
+    ]
+
+
+def _sorted_keys(page, groups, state):
+    js = f"""
+    const groups = {json.dumps(groups)};
+    const cmp = S.compareGroups({json.dumps(state)});
+    const sorted = [...groups].sort(cmp);
+    return JSON.stringify(sorted.map(g => g.key));
+    """
+    return json.loads(_eval(page, js))
+
+
+def test_sort_by_start_asc(page):
+    keys = _sorted_keys(page, _fixture_groups(), {"key": "start", "dir": "asc"})
+    assert keys == ["b", "c", "a", "d"]
+
+
+def test_sort_by_start_desc(page):
+    keys = _sorted_keys(page, _fixture_groups(), {"key": "start", "dir": "desc"})
+    assert keys == ["d", "a", "c", "b"]
+
+
+def test_sort_by_type_uses_label_not_code(page):
+    """Regression: sort by 'type' must compare event_type_label, not event_type."""
+    groups = [
+        {"key": "x", "event_type_label": "Zoo (last alphabetically)",
+         "event_type": "AAA", "sessions": [{"start": "2026-07-30T09:00:00"}], "bgg": None},
+        {"key": "y", "event_type_label": "Acrobatics (first alphabetically)",
+         "event_type": "ZZZ", "sessions": [{"start": "2026-07-30T09:00:00"}], "bgg": None},
+    ]
+    keys = _sorted_keys(page, groups, {"key": "type", "dir": "asc"})
+    assert keys == ["y", "x"]
+
+
+def test_sort_by_type_tiebreak_is_start_asc(page):
+    """Two groups with the same label fall back to start-time ascending."""
+    keys = _sorted_keys(page, _fixture_groups(), {"key": "type", "dir": "asc"})
+    # Board Game appears twice (a, c). c starts earlier than a. RPG (b), Seminar (d).
+    assert keys == ["c", "a", "b", "d"]
+
+
+def test_sort_by_bgg_desc_nulls_last(page):
+    keys = _sorted_keys(page, _fixture_groups(), {"key": "bgg", "dir": "desc"})
+    # c=8.2, a=7.5, then null-bgg rows by start-asc tiebreak: b (07-30) before d (08-01).
+    assert keys == ["c", "a", "b", "d"]
+
+
+def test_sort_by_bgg_asc_nulls_still_last(page):
+    """Per spec Q3: nulls always go to the bottom regardless of direction."""
+    keys = _sorted_keys(page, _fixture_groups(), {"key": "bgg", "dir": "asc"})
+    # a=7.5, c=8.2, then nulls: b, d.
+    assert keys == ["a", "c", "b", "d"]

@@ -84,8 +84,7 @@ function renderFilterRail(state, onChange) {
     </div>
     <div class="group">
       <label><input type="checkbox" id="f-tix" ${state.ticketsOnly?'checked':''}> Tickets available</label><br>
-      <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label><br>
-      <label><input type="checkbox" id="f-saved" ${state.savedOnly?'checked':''}> Saved only</label>
+      <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label>
     </div>
     <div class="group">
       <button id="f-clear" type="button">Clear filters</button>
@@ -110,7 +109,6 @@ function renderFilterRail(state, onChange) {
   wire('#f-bgg', 'input', (e) => state.bggMin = +e.target.value);
   wire('#f-tix', 'change', (e) => state.ticketsOnly = e.target.checked);
   wire('#f-tournament', 'change', (e) => state.tournament = e.target.checked ? 'yes' : 'either');
-  wire('#f-saved', 'change', (e) => state.savedOnly = e.target.checked);
 
   $('#f-bggmatch').addEventListener('click', (e) => {
     const v = e.target.dataset.bgg; if (!v) return;
@@ -140,6 +138,7 @@ function renderResultsToolbar(state, onChange) {
       <button id="s-dir" type="button">${LABELS[state.sortKey][state.sortDir]}</button>
     </div>
     <div class="toolbar-right">
+      <button id="s-saved" type="button" class="${state.savedOnly ? 'active' : ''}">★ Saved (0)</button>
       <button id="s-lucky" type="button" disabled>🎲 I'm Feeling Lucky</button>
     </div>
   `;
@@ -155,6 +154,10 @@ function renderResultsToolbar(state, onChange) {
   document.querySelector('#s-dir').addEventListener('click', () => {
     state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
     document.querySelector('#s-dir').textContent = LABELS[state.sortKey][state.sortDir];
+    onChange();
+  });
+  document.querySelector('#s-saved').addEventListener('click', () => {
+    state.savedOnly = !state.savedOnly;
     onChange();
   });
 }
@@ -201,6 +204,7 @@ async function main() {
   });
   const detailView = createDetailView({
     panel: $('#detail-panel'),
+    onChange: () => applyFilters(),
   });
 
   function attachLuckyHandler() {
@@ -254,6 +258,11 @@ async function main() {
     lastVisibleGroups = visible;
     const lucky = document.querySelector('#s-lucky');
     if (lucky) lucky.disabled = visible.length === 0;
+    const savedBtn = document.querySelector('#s-saved');
+    if (savedBtn) {
+      savedBtn.textContent = `★ Saved (${saved.size})`;
+      savedBtn.classList.toggle('active', state.savedOnly);
+    }
     tableView.setRows(visible);
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +

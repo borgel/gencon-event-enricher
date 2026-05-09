@@ -1,7 +1,7 @@
 import { bggUrl, genconUrl } from './links.js';
-import { isSaved, toggleSaved } from './saved.js';
+import { isSaved, toggleSaved, isPurchased, togglePurchased } from './saved.js';
 
-export function createDetailView({ panel, onCloseToggle }) {
+export function createDetailView({ panel, onCloseToggle, onChange }) {
   panel.innerHTML = '';
 
   function close() {
@@ -13,6 +13,7 @@ export function createDetailView({ panel, onCloseToggle }) {
     panel.classList.remove('hidden');
     panel.setAttribute('aria-hidden', 'false');
   }
+  const fireChange = () => { onChange && onChange(); };
 
   return {
     show(group) {
@@ -23,6 +24,12 @@ export function createDetailView({ panel, onCloseToggle }) {
         toggleSaved(group.key);
         star.classList.toggle('starred');
         star.textContent = isSaved(group.key) ? '★ Saved' : '☆ Save';
+        fireChange();
+      });
+      const purchased = panel.querySelector('.purchased-cb');
+      purchased.addEventListener('change', () => {
+        togglePurchased(group.key);
+        fireChange();
       });
       open();
     },
@@ -32,12 +39,17 @@ export function createDetailView({ panel, onCloseToggle }) {
 
 function render(g) {
   const saved = isSaved(g.key);
+  const purchased = isPurchased(g.key);
   return `
     <span class="close" title="Close detail">✕</span>
     <h2>${escape(g.title)}</h2>
     <div class="meta">${escape(g.event_type_label)} · ${formatPlayers(g)} · ${formatCost(g)} · ${escape(g.age_required)} · ${escape(g.experience_required)}</div>
-    <div style="margin: 6px 0;">
+    <div class="event-actions">
       <button class="save-toggle ${saved ? 'starred' : ''}">${saved ? '★ Saved' : '☆ Save'}</button>
+      <label class="purchased-toggle">
+        <input type="checkbox" class="purchased-cb"${purchased ? ' checked' : ''}>
+        🎟️ Tickets purchased
+      </label>
     </div>
     ${signupRow(g)}
     ${g.bgg ? bggCard(g.bgg) : '<div class="meta" style="font-style:italic">No BGG match.</div>'}

@@ -295,18 +295,98 @@ def test_lucky_button_opens_detail_panel(server):
 
 
 def test_lucky_button_disabled_when_empty(server):
-    """Filter to nothing, button should be disabled."""
+    """Filter to nothing, lucky button should be disabled."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")
-        # bggMatch=yes + savedOnly drops everything (nothing saved by default
-        # and only one BGM has BGG; saved-only kills it).
-        page.click("#f-saved")
+        # Toggling Saved-only with nothing saved drops every row.
+        page.click("#s-saved")
         page.wait_for_function("document.querySelectorAll('.row').length === 0")
         disabled = page.eval_on_selector("#s-lucky", "e => e.disabled")
         assert disabled is True
+        browser.close()
+
+
+def test_saved_toolbar_button_count_and_active_state(server):
+    """The toolbar saved button shows a live count and toggles the filter."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        # Fresh context — clean localStorage.
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#s-saved")
+        # Initially: count 0, not active.
+        text = page.eval_on_selector("#s-saved", "e => e.textContent")
+        assert "(0)" in text
+        active = page.eval_on_selector("#s-saved", "e => e.classList.contains('active')")
+        assert active is False
+        # Save an event from the detail panel.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        # Count updates live.
+        page.wait_for_function(
+            "document.querySelector('#s-saved').textContent.includes('(1)')"
+        )
+        # Click Saved button -> active, filter applies.
+        page.click("#s-saved")
+        page.wait_for_function(
+            "document.querySelector('#s-saved').classList.contains('active')"
+        )
+        # The saved row remains visible; the unsaved row is filtered out.
+        page.wait_for_function("document.querySelectorAll('.row').length === 1")
+        # Click again -> inactive, all rows back.
+        page.click("#s-saved")
+        page.wait_for_function("document.querySelectorAll('.row').length === 2")
+        # Old rail checkbox is gone.
+        assert page.query_selector("#f-saved") is None
+        ctx.close()
+        browser.close()
+
+
+def test_purchased_toggle_persists(server):
+    """Tickets purchased state survives a page reload (localStorage-backed)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Open detail, tick "Tickets purchased".
+        page.click(".row")
+        page.click("#detail-panel .purchased-cb")
+        # Reload, reopen detail for the same row.
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click(".row")
+        checked = page.eval_on_selector("#detail-panel .purchased-cb", "e => e.checked")
+        assert checked is True
+        ctx.close()
+        browser.close()
+
+
+def test_purchased_orthogonal_to_saved(server):
+    """Purchased and Saved are independent flags (Q1=A)."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Tick Purchased; do NOT tick Saved.
+        page.click(".row")
+        page.click("#detail-panel .purchased-cb")
+        # The Save toggle must remain in its initial (unsaved) state.
+        save_label = page.eval_on_selector(
+            "#detail-panel .save-toggle", "e => e.textContent.trim()"
+        )
+        assert save_label.startswith("☆")  # ☆ Save (not ★ Saved)
+        # And the toolbar saved-count is still 0.
+        text = page.eval_on_selector("#s-saved", "e => e.textContent")
+        assert "(0)" in text
+        ctx.close()
         browser.close()
 
 

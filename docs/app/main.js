@@ -364,6 +364,7 @@ async function main() {
     }
     const tlBtn = document.querySelector('#s-timeline');
     if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');
+    document.body.classList.toggle('timeline-on', state.viewMode === 'timeline');
     // List is always visible and always in sync with the predicate.
     tableView.setRows(visible, {
       saved,

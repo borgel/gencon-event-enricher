@@ -349,4 +349,9 @@ body.drawer-open #drawer-backdrop {
     z-index: 25;
     border-left: none;
   }
+  /* Timeline replaces the list at full width when active. */
+  body.timeline-on #results-list,
+  body.timeline-on #results-header {
+    display: none;
+  }
 }

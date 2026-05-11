@@ -1062,3 +1062,54 @@ def test_phone_detail_panel_full_screen(server):
         assert rect["y"] + rect["h"] >= 700
         ctx.close()
         browser.close()
+
+
+def test_phone_timeline_hides_list_and_scrolls(server):
+    """At phone width: enabling timeline hides the list, timeline takes full width."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Click timeline toggle.
+        page.click("#s-timeline")
+        page.wait_for_function(
+            "document.body.classList.contains('timeline-on')"
+        )
+        list_display = page.eval_on_selector(
+            "#results-list", "e => getComputedStyle(e).display"
+        )
+        assert list_display == "none"
+        # Timeline panel is visible and has overflow: auto for horizontal scroll.
+        tl_overflow = page.eval_on_selector(
+            "#results-timeline", "e => getComputedStyle(e).overflowX"
+        )
+        assert tl_overflow == "auto"
+        # Header row is also hidden on phone timeline mode.
+        header_display = page.eval_on_selector(
+            "#results-header", "e => getComputedStyle(e).display"
+        )
+        assert header_display == "none"
+        ctx.close()
+        browser.close()
+
+
+def test_desktop_timeline_keeps_list_visible(server):
+    """At desktop width: enabling timeline keeps the list visible alongside."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#s-timeline")
+        page.wait_for_function(
+            "!document.querySelector('#results-timeline').classList.contains('hidden')"
+        )
+        list_display = page.eval_on_selector(
+            "#results-list", "e => getComputedStyle(e).display"
+        )
+        assert list_display != "none"
+        ctx.close()
+        browser.close()

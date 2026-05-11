@@ -110,15 +110,37 @@ function formatMarks(g, userState) {
   return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
 }
 
-function formatWhen(g) {
-  const s = g.sessions[0];
-  if (!s) return '';
+export function formatWhen(g) {
+  const sessions = g.sessions || [];
+  if (!sessions.length) return '';
+  if (sessions.length === 1) {
+    return formatSingleSession(sessions[0]);
+  }
+  // Multi-session: derive first and last day codes from sorted starts.
+  const sortedStarts = sessions.map(s => s.start).sort();
+  const firstDay = dayCodeFromIso(sortedStarts[0]);
+  const lastDay = dayCodeFromIso(sortedStarts[sortedStarts.length - 1]);
+  if (firstDay === lastDay) {
+    return `${sessions.length}× ${firstDay}`;
+  }
+  return `${sessions.length}× ${firstDay}–${lastDay}`;
+}
+
+function formatSingleSession(s) {
   const d = new Date(s.start);
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const day = dayCodeFromIso(s.start);
   const h = d.getHours();
+  const m = d.getMinutes();
   const ampm = h < 12 ? 'a' : 'p';
   const h12 = ((h + 11) % 12) + 1;
-  return `${day} ${h12}${ampm}`;
+  return m === 0
+    ? `${day} ${h12}${ampm}`
+    : `${day} ${h12}:${String(m).padStart(2, '0')}${ampm}`;
+}
+
+function dayCodeFromIso(iso) {
+  const d = new Date(iso);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
 }
 
 function formatMeta(g) {

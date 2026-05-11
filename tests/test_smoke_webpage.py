@@ -1064,6 +1064,23 @@ def test_phone_detail_panel_full_screen(server):
         browser.close()
 
 
+def test_phone_toolbar_overflows_with_scroll(server):
+    """At phone width: toolbar-right has horizontal scroll if its buttons overflow."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#results-toolbar")
+        overflow_x = page.eval_on_selector(
+            "#results-toolbar .toolbar-right",
+            "e => getComputedStyle(e).overflowX",
+        )
+        assert overflow_x == "auto"
+        ctx.close()
+        browser.close()
+
+
 def test_phone_timeline_hides_list_and_scrolls(server):
     """At phone width: enabling timeline hides the list, timeline takes full width."""
     with sync_playwright() as p:

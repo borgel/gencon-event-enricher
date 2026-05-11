@@ -354,4 +354,11 @@ body.drawer-open #drawer-backdrop {
   body.timeline-on #results-header {
     display: none;
   }
+  /* Toolbar can overflow horizontally on narrow screens. */
+  #results-toolbar .toolbar-right,
+  #results-toolbar .toolbar-left {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }

@@ -984,3 +984,54 @@ def test_row_columns_b_aligned(server):
         )
         assert cell_classes == ["marks", "title", "type", "when", "tix", "bgg"]
         browser.close()
+
+
+def test_phone_hamburger_toggles_drawer(server):
+    """At phone width: hamburger button visible; clicking toggles drawer."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+
+        # Hamburger is visible on phone (display != 'none').
+        ham_display = page.eval_on_selector(
+            "#hamburger", "e => getComputedStyle(e).display"
+        )
+        assert ham_display != "none"
+
+        # Drawer closed initially.
+        body_classes_before = page.eval_on_selector("body", "e => e.className")
+        assert "drawer-open" not in body_classes_before
+
+        # Click hamburger → drawer opens.
+        page.click("#hamburger")
+        page.wait_for_function(
+            "document.body.classList.contains('drawer-open')"
+        )
+
+        # Click the backdrop → drawer closes.
+        page.click("#drawer-backdrop")
+        page.wait_for_function(
+            "!document.body.classList.contains('drawer-open')"
+        )
+
+        ctx.close()
+        browser.close()
+
+
+def test_desktop_hamburger_hidden(server):
+    """At desktop width: hamburger is display: none."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#hamburger", state="attached")
+        ham_display = page.eval_on_selector(
+            "#hamburger", "e => getComputedStyle(e).display"
+        )
+        assert ham_display == "none"
+        ctx.close()
+        browser.close()

@@ -197,6 +197,16 @@ function populateMultiselect(id, values, set, onChange, labels = {}) {
 async function main() {
   const blob = await loadData();
   renderHeaderMeta(blob.meta);
+
+  // Drawer toggle — only meaningful at phone width but the listeners are
+  // safe to attach unconditionally (the hamburger is display:none on desktop).
+  $('#hamburger').addEventListener('click', () => {
+    document.body.classList.toggle('drawer-open');
+  });
+  $('#drawer-backdrop').addEventListener('click', () => {
+    document.body.classList.remove('drawer-open');
+  });
+
   for (const g of blob.groups) groupsByKey.set(g.key, g);
 
   let state = hashToState(window.location.hash);

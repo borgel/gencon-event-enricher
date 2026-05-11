@@ -286,3 +286,55 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 #results-toolbar #s-timeline.active {
   background: var(--accent); color: #fff; border-color: var(--accent);
 }
+
+/* Hamburger button is hidden on desktop; visible only on phone via media query below. */
+#hamburger {
+  display: none;
+  font: inherit;
+  font-size: 18px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 8px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+/* Drawer backdrop covers content when drawer is open. */
+#drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 19;
+}
+body.drawer-open #drawer-backdrop {
+  display: block;
+}
+
+/* ----- Phone breakpoint ----- */
+@media (max-width: 768px) {
+  #hamburger {
+    display: inline-block;
+  }
+  /* Filter rail becomes a left-edge drawer. */
+  #filter-rail {
+    position: fixed;
+    top: 38px;
+    left: 0;
+    bottom: 0;
+    width: 75vw;
+    max-width: 320px;
+    z-index: 20;
+    transform: translateX(-100%);
+    transition: transform 0.2s;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  }
+  body.drawer-open #filter-rail {
+    transform: translateX(0);
+  }
+  /* App-shell collapses to a single column when rail is fixed-positioned. */
+  #app-shell {
+    grid-template-columns: 1fr;
+  }
+}

@@ -88,9 +88,6 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   letter-spacing: 0.04em;
   height: 26px;
   cursor: default;
-  position: sticky;
-  top: 0;
-  z-index: 1;
 }
 .row .marks { font-size: 13px; line-height: 1; letter-spacing: -1px; }
 .row:hover { background: #f9fbff; }

@@ -1035,3 +1035,30 @@ def test_desktop_hamburger_hidden(server):
         assert ham_display == "none"
         ctx.close()
         browser.close()
+
+
+def test_phone_detail_panel_full_screen(server):
+    """At phone width: opening an event makes #detail-panel a full-screen overlay."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click(".row")
+        page.wait_for_function(
+            "!document.querySelector('#detail-panel').classList.contains('hidden')"
+        )
+        rect = page.eval_on_selector(
+            "#detail-panel",
+            "e => { const r = e.getBoundingClientRect(); return {x:r.x, y:r.y, w:r.width, h:r.height}; }",
+        )
+        # Panel covers the viewport below the 38px-ish header.
+        assert rect["x"] == 0
+        assert rect["w"] == 375
+        # Top must be at or below the app-header (around 38px).
+        assert rect["y"] >= 30 and rect["y"] <= 50
+        # Bottom extends to/past the viewport.
+        assert rect["y"] + rect["h"] >= 700
+        ctx.close()
+        browser.close()

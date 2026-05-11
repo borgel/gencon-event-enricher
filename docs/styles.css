@@ -58,6 +58,7 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   color: var(--muted); font-size: 12px;
 }
 #results-body { flex: 1; display: flex; min-height: 0; }
+#results-list-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #results-list { flex: 1; overflow-y: auto; position: relative; }
 
 .row {
@@ -351,8 +352,7 @@ body.drawer-open #drawer-backdrop {
     border-left: none;
   }
   /* Timeline replaces the list at full width when active. */
-  body.timeline-on #results-list,
-  body.timeline-on #results-header {
+  body.timeline-on #results-list-wrap {
     display: none;
   }
   /* Toolbar can overflow horizontally on narrow screens. */

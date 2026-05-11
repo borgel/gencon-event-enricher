@@ -971,6 +971,27 @@ def test_list_has_column_header_row(server):
         browser.close()
 
 
+def test_header_stacks_above_list(server):
+    """Regression: #results-header must stack ABOVE #results-list (same width),
+    not sit beside it as a separate flex-row column."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        rects = page.evaluate("""() => {
+            const h = document.querySelector('#results-header').getBoundingClientRect();
+            const l = document.querySelector('#results-list').getBoundingClientRect();
+            return { hx: h.x, hw: h.width, lx: l.x, lw: l.width, hy: h.y, lyTop: l.y };
+        }""")
+        # Same left edge and same width = stacked vertically inside the same column.
+        assert abs(rects["hx"] - rects["lx"]) < 1, f"header.x={rects['hx']}, list.x={rects['lx']}"
+        assert abs(rects["hw"] - rects["lw"]) < 1, f"header.w={rects['hw']}, list.w={rects['lw']}"
+        # Header sits above the list (smaller y).
+        assert rects["hy"] < rects["lyTop"]
+        browser.close()
+
+
 def test_row_columns_b_aligned(server):
     """Row uses the new grid template — marks · title · type · when · tix · bgg."""
     with sync_playwright() as p:
@@ -1094,20 +1115,21 @@ def test_phone_timeline_hides_list_and_scrolls(server):
         page.wait_for_function(
             "document.body.classList.contains('timeline-on')"
         )
-        list_display = page.eval_on_selector(
-            "#results-list", "e => getComputedStyle(e).display"
+        # The list is wrapped in #results-list-wrap which gets display:none.
+        wrap_display = page.eval_on_selector(
+            "#results-list-wrap", "e => getComputedStyle(e).display"
         )
-        assert list_display == "none"
+        assert wrap_display == "none"
+        # The list element is effectively hidden (zero width inside the hidden wrap).
+        list_width = page.eval_on_selector(
+            "#results-list", "e => e.getBoundingClientRect().width"
+        )
+        assert list_width == 0
         # Timeline panel is visible and has overflow: auto for horizontal scroll.
         tl_overflow = page.eval_on_selector(
             "#results-timeline", "e => getComputedStyle(e).overflowX"
         )
         assert tl_overflow == "auto"
-        # Header row is also hidden on phone timeline mode.
-        header_display = page.eval_on_selector(
-            "#results-header", "e => getComputedStyle(e).display"
-        )
-        assert header_display == "none"
         ctx.close()
         browser.close()
 

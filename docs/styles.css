@@ -62,7 +62,8 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 
 .row {
   display: grid;
-  grid-template-columns: 36px 90px 1fr 60px 50px 70px;
+  /* marks · title · type · when · tix · bgg */
+  grid-template-columns: 32px 1fr 50px 100px 60px 70px;
   align-items: center;
   height: var(--row-h);
   padding: 0 12px;
@@ -71,11 +72,32 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   cursor: pointer;
   white-space: nowrap; overflow: hidden;
 }
+.row-header {
+  display: grid;
+  /* marks · title · type · when · tix · bgg */
+  grid-template-columns: 32px 1fr 50px 100px 60px 70px;
+  align-items: center;
+  padding: 0 12px;
+  white-space: nowrap; overflow: hidden;
+  background: #f4f4f4;
+  border-bottom: 1px solid #ccc;
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  height: 26px;
+  cursor: default;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
 .row .marks { font-size: 13px; line-height: 1; letter-spacing: -1px; }
 .row:hover { background: #f9fbff; }
 .row.selected { background: #e8f0ff; }
-.row .when { color: var(--muted); font-variant-numeric: tabular-nums; }
-.row .title { overflow: hidden; text-overflow: ellipsis; }
+.row-cell.title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-cell.type, .row-cell.when { color: #666; font-size: 11px; }
+.row-cell.when { font-variant-numeric: tabular-nums; }
 .row .meta { color: var(--muted); font-size: 11px; }
 .row .tix.have { color: var(--good); }
 .row .tix.gone { color: var(--bad); }

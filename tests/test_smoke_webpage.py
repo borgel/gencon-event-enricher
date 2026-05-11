@@ -953,3 +953,34 @@ def test_saved_button_keeps_list_view(server):
         assert "hidden" not in page.eval_on_selector("#results-list", "e => e.className")
         ctx.close()
         browser.close()
+
+
+def test_list_has_column_header_row(server):
+    """The list area has a header row above #results-list with column labels."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#results-header")
+        labels = page.eval_on_selector_all(
+            "#results-header .row-cell",
+            "els => els.map(e => e.textContent.trim()).filter(Boolean)",
+        )
+        # Header labels in order (the leading empty marks cell is filtered out).
+        assert labels == ["Title", "Type", "When", "Tix", "BGG"]
+        browser.close()
+
+
+def test_row_columns_b_aligned(server):
+    """Row uses the new grid template — marks · title · type · when · tix · bgg."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        cell_classes = page.eval_on_selector(
+            ".row",
+            "e => [...e.children].map(c => c.className.split(' ')[0])",
+        )
+        assert cell_classes == ["marks", "title", "type", "when", "tix", "bgg"]
+        browser.close()

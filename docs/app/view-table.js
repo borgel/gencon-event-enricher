@@ -93,12 +93,12 @@ function makeRow(g, userState) {
     row.classList.add('conflict');
   }
   row.innerHTML = `
-    <span class="marks">${formatMarks(g, userState)}</span>
-    <span class="when">${formatWhen(g)}</span>
-    <span class="title">${escape(g.title)} <span class="meta">${formatMeta(g)}</span></span>
-    <span class="meta">${escape(g.event_type)}</span>
-    <span class="tix ${ticketsClass(g)}">${formatTix(g)}</span>
-    <span class="bgg ${g.bgg ? '' : 'none'}">${formatBgg(g)}</span>
+    <span class="marks row-cell">${formatMarks(g, userState)}</span>
+    <span class="title row-cell">${escape(g.title)}</span>
+    <span class="type row-cell">${escape(g.event_type)}</span>
+    <span class="when row-cell">${escape(formatWhen(g))}</span>
+    <span class="tix row-cell ${ticketsClass(g)}">${formatTix(g)}</span>
+    <span class="bgg row-cell ${g.bgg ? '' : 'none'}">${formatBgg(g)}</span>
   `;
   return row;
 }
@@ -143,11 +143,6 @@ function dayCodeFromIso(iso) {
   return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
 }
 
-function formatMeta(g) {
-  const dur = g.duration_minutes ? `${(g.duration_minutes / 60).toFixed(g.duration_minutes % 60 ? 1 : 0)}h` : '';
-  const sessions = g.sessions.length > 1 ? ` · ${g.sessions.length} sessions` : '';
-  return `· ${dur}${sessions}`;
-}
 
 function ticketsClass(g) {
   const total = g.sessions.reduce((sum, s) => sum + (s.tickets_available ?? 0), 0);

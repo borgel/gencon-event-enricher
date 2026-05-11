@@ -349,14 +349,14 @@ def test_saved_toolbar_button_count_and_active_state(server):
         page.wait_for_function(
             "document.querySelector('#s-saved').textContent.includes('(1)')"
         )
-        # Click Saved button -> active, filter applies.
+        # Click Saved button -> active, filter applies in the list.
         page.click("#s-saved")
         page.wait_for_function(
             "document.querySelector('#s-saved').classList.contains('active')"
         )
         # The saved row remains visible; the unsaved row is filtered out.
         page.wait_for_function("document.querySelectorAll('.row').length === 1")
-        # Click again -> inactive, all rows back.
+        # Click Saved again -> inactive, all rows back.
         page.click("#s-saved")
         page.wait_for_function("document.querySelectorAll('.row').length === 2")
         # Old rail checkbox is gone.
@@ -862,7 +862,8 @@ def test_timeline_preview_blocks_unit(server):
 
 
 def test_toolbar_timeline_toggle(server):
-    """Clicking the 🗓️ Timeline button switches the results pane to timeline view."""
+    """Clicking the 🗓️ Timeline button shows/hides the timeline panel
+    alongside the (always-visible) list view."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
@@ -877,8 +878,11 @@ def test_toolbar_timeline_toggle(server):
         page.wait_for_function(
             "!document.querySelector('#results-timeline').classList.contains('hidden')"
         )
-        assert "hidden" in page.eval_on_selector("#results-list", "e => e.className")
+        # Timeline now visible; list stays visible (side-by-side).
         assert "hidden" not in page.eval_on_selector("#results-timeline", "e => e.className")
+        assert page.eval_on_selector(
+            "#results-list", "e => getComputedStyle(e).display"
+        ) != "none"
         # Hash records the mode.
         h = page.evaluate("() => window.location.hash")
         assert "view=timeline" in h
@@ -889,5 +893,63 @@ def test_toolbar_timeline_toggle(server):
         )
         h2 = page.evaluate("() => window.location.hash")
         assert "view=timeline" not in h2
+        ctx.close()
+        browser.close()
+
+
+def test_list_stays_visible_in_timeline_mode(server):
+    """Side-by-side semantics: enabling timeline mode keeps the list visible
+    AND in-sync with the predicate. Both panels render together."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Save the BGM session so we have something to filter to.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        page.click("#detail-panel .close")
+        # Enable timeline.
+        page.click("#s-timeline")
+        page.wait_for_function(
+            "!document.querySelector('#results-timeline').classList.contains('hidden')"
+        )
+        # The list must remain visible (not display:none).
+        list_display = page.eval_on_selector(
+            "#results-list", "e => getComputedStyle(e).display"
+        )
+        assert list_display != "none", f"list shouldn't be hidden, got {list_display!r}"
+        # And the list must still reflect the current filter state. Toggle
+        # Saved-only to confirm setRows is being called in timeline mode.
+        n_before = page.eval_on_selector_all(".row", "els => els.length")
+        page.click("#s-saved")
+        page.wait_for_function(
+            "document.querySelector('#s-saved').classList.contains('active')"
+        )
+        page.wait_for_function("document.querySelectorAll('.row').length === 1")
+        n_after = page.eval_on_selector_all(".row", "els => els.length")
+        assert n_after == 1, f"list didn't update: was {n_before}, now {n_after}"
+        ctx.close()
+        browser.close()
+
+
+def test_saved_button_keeps_list_view(server):
+    """Toggling Saved-only filters the list in place; it does NOT switch to timeline."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#s-saved")
+        # Initially: list view.
+        assert "hidden" in page.eval_on_selector("#results-timeline", "e => e.className")
+        page.click("#s-saved")
+        page.wait_for_function(
+            "document.querySelector('#s-saved').classList.contains('active')"
+        )
+        # List view stays visible; timeline stays hidden.
+        assert "hidden" in page.eval_on_selector("#results-timeline", "e => e.className")
+        assert "hidden" not in page.eval_on_selector("#results-list", "e => e.className")
         ctx.close()
         browser.close()

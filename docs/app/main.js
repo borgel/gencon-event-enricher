@@ -354,8 +354,14 @@ async function main() {
     }
     const tlBtn = document.querySelector('#s-timeline');
     if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');
+    // List is always visible and always in sync with the predicate.
+    tableView.setRows(visible, {
+      saved,
+      purchased,
+      conflicts: latestOverlap.conflictedGroups,
+    });
+    // Timeline is an additional side-by-side panel, toggled by viewMode.
     if (state.viewMode === 'timeline') {
-      $('#results-list').classList.add('hidden');
       $('#results-timeline').classList.remove('hidden');
       const conflictedSessionIds = new Set(
         [...overlapInfo.perSession.entries()]
@@ -371,12 +377,6 @@ async function main() {
       );
     } else {
       $('#results-timeline').classList.add('hidden');
-      $('#results-list').classList.remove('hidden');
-      tableView.setRows(visible, {
-        saved,
-        purchased,
-        conflicts: latestOverlap.conflictedGroups,
-      });
     }
     $('#results-summary').textContent =
       `${visible.length.toLocaleString()} groups visible · ` +

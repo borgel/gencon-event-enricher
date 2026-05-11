@@ -361,4 +361,11 @@ body.drawer-open #drawer-backdrop {
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
   }
+  /* Hide the Type column and drop its grid track. */
+  .row .type, #results-header .type {
+    display: none;
+  }
+  .row, #results-header {
+    grid-template-columns: 28px 1fr 80px 50px 56px;
+  }
 }

@@ -1130,3 +1130,37 @@ def test_desktop_timeline_keeps_list_visible(server):
         assert list_display != "none"
         ctx.close()
         browser.close()
+
+
+def test_phone_type_column_hidden(server):
+    """At phone width: the Type column has display:none in rows and header."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        row_type_display = page.eval_on_selector(
+            ".row .type", "e => getComputedStyle(e).display"
+        )
+        header_type_display = page.eval_on_selector(
+            "#results-header .type", "e => getComputedStyle(e).display"
+        )
+        assert row_type_display == "none"
+        assert header_type_display == "none"
+        ctx.close()
+        browser.close()
+
+
+def test_desktop_type_column_visible(server):
+    """At desktop width: Type column is visible."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        d = page.eval_on_selector(".row .type", "e => getComputedStyle(e).display")
+        assert d != "none"
+        ctx.close()
+        browser.close()

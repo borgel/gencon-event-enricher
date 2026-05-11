@@ -1164,3 +1164,51 @@ def test_desktop_type_column_visible(server):
         assert d != "none"
         ctx.close()
         browser.close()
+
+
+def test_phone_body_scroll_locked_when_drawer_open(server):
+    """At phone width: body has overflow:hidden when drawer is open."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#hamburger")
+        # Pre-condition: body scrolls normally.
+        before = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
+        assert before != "hidden"
+        page.click("#hamburger")
+        page.wait_for_function("document.body.classList.contains('drawer-open')")
+        after = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
+        assert after == "hidden"
+        page.click("#drawer-backdrop")
+        page.wait_for_function("!document.body.classList.contains('drawer-open')")
+        restored = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
+        assert restored != "hidden"
+        ctx.close()
+        browser.close()
+
+
+def test_phone_body_scroll_locked_when_detail_open(server):
+    """At phone width: body locks scroll when the detail panel is open."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click(".row")
+        page.wait_for_function(
+            "!document.querySelector('#detail-panel').classList.contains('hidden')"
+        )
+        overflow = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
+        assert overflow == "hidden"
+        # Close detail panel via the close button inside the panel.
+        page.click("#detail-panel .close")
+        page.wait_for_function(
+            "document.querySelector('#detail-panel').classList.contains('hidden')"
+        )
+        restored = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
+        assert restored != "hidden"
+        ctx.close()
+        browser.close()

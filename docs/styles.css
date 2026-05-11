@@ -287,6 +287,10 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
   background: var(--accent); color: #fff; border-color: var(--accent);
 }
 
+body.lock-scroll {
+  overflow: hidden;
+}
+
 /* Hamburger button is hidden on desktop; visible only on phone via media query below. */
 #hamburger {
   display: none;

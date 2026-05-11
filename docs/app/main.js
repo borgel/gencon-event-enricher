@@ -200,11 +200,18 @@ async function main() {
 
   // Drawer toggle — only meaningful at phone width but the listeners are
   // safe to attach unconditionally (the hamburger is display:none on desktop).
+  function setLockScroll() {
+    const open = document.body.classList.contains('drawer-open')
+              || !document.querySelector('#detail-panel').classList.contains('hidden');
+    document.body.classList.toggle('lock-scroll', open);
+  }
   $('#hamburger').addEventListener('click', () => {
     document.body.classList.toggle('drawer-open');
+    setLockScroll();
   });
   $('#drawer-backdrop').addEventListener('click', () => {
     document.body.classList.remove('drawer-open');
+    setLockScroll();
   });
 
   for (const g of blob.groups) groupsByKey.set(g.key, g);
@@ -238,8 +245,8 @@ async function main() {
   const detailView = createDetailView({
     panel: $('#detail-panel'),
     onChange: () => applyFilters(),
-    onShow: (g) => { openGroup = g; },
-    onClose: () => { openGroup = null; },
+    onShow: (g) => { openGroup = g; setLockScroll(); },
+    onClose: () => { openGroup = null; setLockScroll(); },
   });
   const timelineView = createTimelineView({
     container: $('#results-timeline'),

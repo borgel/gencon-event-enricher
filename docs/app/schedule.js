@@ -5,9 +5,13 @@
 //   It's the load-bearing matcher on import; gencon_id is a fallback.
 // - title and when are informational so the CSV is readable in Excel.
 // - Only sessions with saved=1 or purchased=1 are included on export.
+// - If options.name is a non-empty string, a leading '# name=<value>' row is
+//   written before the column header. parseScheduleCSV reads it back out.
 
-export function exportSchedule(groups, saved, purchased) {
-  const rows = [['event_id', 'gencon_id', 'title', 'when', 'saved', 'purchased']];
+export function exportSchedule(groups, saved, purchased, options = {}) {
+  const rows = [];
+  if (options.name) rows.push([`# name=${options.name}`]);
+  rows.push(['event_id', 'gencon_id', 'title', 'when', 'saved', 'purchased']);
   for (const g of groups) {
     for (const s of g.sessions || []) {
       const isSaved = saved.has(s.gencon_id);
@@ -25,13 +29,37 @@ export function exportSchedule(groups, saved, purchased) {
       ]);
     }
   }
-  return rows.map(r => r.map(csvEscape).join(',')).join('\n') + '\n';
+  return rows.map(r => {
+    // Metadata rows are written as a single literal cell with no escaping
+    // (they start with '#', so CSV consumers ignore the line cleanly).
+    if (r.length === 1 && r[0].startsWith('#')) return r[0];
+    return r.map(csvEscape).join(',');
+  }).join('\n') + '\n';
 }
 
 export function parseScheduleCSV(text, groups) {
-  const rows = parseCSV(text);
+  const allRows = parseCSV(text);
+  let name = '';
+  let i = 0;
+  while (i < allRows.length) {
+    const r = allRows[i];
+    if (r.length === 1 && r[0].startsWith('#')) {
+      const meta = r[0].slice(1).trim(); // strip leading '#'
+      const eq = meta.indexOf('=');
+      if (eq > 0) {
+        const k = meta.slice(0, eq).trim();
+        const v = meta.slice(eq + 1).trim();
+        if (k === 'name') name = v;
+        // unknown keys ignored
+      }
+      i++;
+      continue;
+    }
+    break;
+  }
+  const rows = allRows.slice(i);
   if (rows.length < 2) {
-    return { saved: new Set(), purchased: new Set(), matched: 0, missed: 0 };
+    return { name, saved: new Set(), purchased: new Set(), matched: 0, missed: 0 };
   }
   const header = rows[0].map(h => h.trim().toLowerCase());
   const idx = {
@@ -56,8 +84,8 @@ export function parseScheduleCSV(text, groups) {
   const newSaved = new Set();
   const newPurchased = new Set();
   let matched = 0, missed = 0;
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
+  for (let j = 1; j < rows.length; j++) {
+    const r = rows[j];
     if (r.length === 0 || (r.length === 1 && r[0] === '')) continue;
     let gid = null;
     if (idx.event_id >= 0 && r[idx.event_id]) {
@@ -72,7 +100,7 @@ export function parseScheduleCSV(text, groups) {
     if (idx.saved >= 0 && truthy(r[idx.saved])) newSaved.add(gid);
     if (idx.purchased >= 0 && truthy(r[idx.purchased])) newPurchased.add(gid);
   }
-  return { saved: newSaved, purchased: newPurchased, matched, missed };
+  return { name, saved: newSaved, purchased: newPurchased, matched, missed };
 }
 
 export function triggerDownload(filename, content, mime = 'text/csv') {

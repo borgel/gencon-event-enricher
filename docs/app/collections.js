@@ -63,18 +63,10 @@ export function assignNextColor(existingColors) {
   return FRIEND_PALETTE[hashIndex(salt, FRIEND_PALETTE.length)];
 }
 
-function assignColorForNew(id, existingColors) {
-  const used = new Set(existingColors);
-  for (const c of FRIEND_PALETTE) {
-    if (!used.has(c)) return c;
-  }
-  return FRIEND_PALETTE[hashIndex(id, FRIEND_PALETTE.length)];
-}
-
 export function createCollection({ name, saved, purchased, originalExportName }) {
   const all = readAll();
   const id = makeCollectionId();
-  const color = assignColorForNew(id, all.map(c => c.color));
+  const color = assignNextColor(all.map(c => c.color));
   const c = {
     id,
     name: name || originalExportName || 'Untitled',

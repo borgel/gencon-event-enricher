@@ -41,7 +41,10 @@ export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClo
         });
       });
       open();
-      onShow && onShow(group);
+      // opts.skipOnShow lets callers re-render the panel without re-firing
+      // the onShow callback (used by applyFilters to refresh the panel in
+      // place — otherwise onShow's applyFilters would recurse).
+      if (!opts?.skipOnShow) onShow && onShow(group);
     },
     hide: close,
   };

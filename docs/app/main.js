@@ -247,8 +247,8 @@ async function main() {
   const detailView = createDetailView({
     panel: $('#detail-panel'),
     onChange: () => applyFilters(),
-    onShow: (g) => { openGroup = g; setLockScroll(); },
-    onClose: () => { openGroup = null; setLockScroll(); },
+    onShow: (g) => { openGroup = g; setLockScroll(); applyFilters(); },
+    onClose: () => { openGroup = null; setLockScroll(); applyFilters(); },
   });
   const timelineView = createTimelineView({
     container: $('#results-timeline'),
@@ -373,7 +373,7 @@ async function main() {
     const overlapInfo = groupOverlapMap(blob.groups, saved, purchased);
     latestOverlap = overlapInfo;
     if (openGroup) {
-      detailView.show(openGroup, overlapInfo.perSession, { allCollections: listCollections() });
+      detailView.show(openGroup, overlapInfo.perSession, { allCollections: listCollections(), skipOnShow: true });
     }
     const mineSaved = new Set([...saved, ...purchased]);
     const collections = listCollections();

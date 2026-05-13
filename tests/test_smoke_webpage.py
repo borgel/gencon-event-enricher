@@ -1704,3 +1704,32 @@ def test_manage_modal_delete(server):
         assert collections == []
         ctx.close()
         browser.close()
+
+
+def test_timeline_preview_blocks_track_detail_panel(server):
+    """Opening a detail panel while timeline is on must show preview blocks
+    immediately; closing the panel must clear them. Regression: previously
+    these only updated when something else triggered applyFilters()."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Switch to timeline view first, then open a row's detail panel.
+        page.evaluate("location.hash = 'view=timeline'")
+        page.wait_for_selector("#results-timeline:not(.hidden)")
+        # No preview blocks before any panel is open.
+        assert page.query_selector("#results-timeline .tl-preview") is None
+        page.click(".row")
+        # Preview blocks for the clicked group's sessions appear without
+        # requiring a separate save action.
+        page.wait_for_selector("#results-timeline .tl-preview")
+        # Close the detail panel — preview blocks clear without needing a
+        # timeline-toggle cycle.
+        page.click("#detail-panel .close")
+        page.wait_for_function(
+            "document.querySelector('#results-timeline .tl-preview') === null"
+        )
+        ctx.close()
+        browser.close()

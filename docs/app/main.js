@@ -1,18 +1,14 @@
 import { loadData } from './data.js';
 import { defaultState, buildPredicate, stateToHash, hashToState } from './filters.js';
 import { buildIndex, searchKeys } from './search.js';
-import { getSaved, getPurchased, replaceSaved, replacePurchased } from './saved.js';
-import { exportSchedule, parseScheduleCSV, triggerDownload } from './schedule.js';
+import { getSaved, getPurchased } from './saved.js';
 import { createTableView } from './view-table.js';
 import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
-import {
-  listCollections, createCollection, replaceCollection, findByName,
-  getMyName, setMyName, getCollection,
-  renameCollection, deleteCollection,
-} from './collections.js';
+import { listCollections } from './collections.js';
+import { installModals, openManageModal } from './modals.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -313,21 +309,6 @@ async function main() {
     }
   }
 
-  function attachScheduleHandlers() {
-    document.querySelector('#f-export').addEventListener('click', () => {
-      openExportModal();
-    });
-    document.querySelector('#f-import').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const text = await file.text();
-      const result = parseScheduleCSV(text, blob.groups);
-      openImportModal(result, text);
-      // Reset so the same file can be re-selected later.
-      e.target.value = '';
-    });
-  }
-
   function attachClearHandler() {
     document.querySelector('#f-clear').addEventListener('click', () => {
       // Reset all filters; flip ticketsOnly OFF (so sold-out events also show);
@@ -357,7 +338,6 @@ async function main() {
     renderResultsToolbar(state, applyFilters);
     attachLuckyHandler();
     attachClearHandler();
-    attachScheduleHandlers();
     attachTypeBulkHandlers();
   }
 
@@ -465,258 +445,21 @@ async function main() {
     applyFilters();
   });
 
-  // ── Import modal ──────────────────────────────────────────────────────────
-
-  let pendingImportResult = null;
-
-  function openImportModal(result, /* rawText */ _rawText) {
-    const modal = document.querySelector('#import-modal');
-    const backdrop = document.querySelector('#modal-backdrop');
-    modal.querySelector('.summary').textContent =
-      `${result.matched} sessions matched` +
-      (result.missed ? `, ${result.missed} not found in current data` : '');
-    pendingImportResult = result;
-
-    // Populate the replace-list <select> with current collections.
-    const select = modal.querySelector('#replace-list-select');
-    select.innerHTML = '';
-    for (const c of listCollections()) {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      select.appendChild(opt);
-    }
-
-    // Pre-fill the new-list-name input with the imported CSV's `name`.
-    modal.querySelector('#new-list-name').value = result.name || '';
-
-    // Smart default: pick the most appropriate action based on imported name and existing state.
-    const radios = modal.querySelectorAll('input[name=import-action]');
-    radios.forEach(r => r.checked = false);
-    let defaultAction = 'replace-mine';
-    if (result.name) {
-      const existing = findByName(result.name);
-      if (existing) {
-        defaultAction = 'replace-list';
-        select.value = existing.id;
-      } else {
-        defaultAction = 'new-list';
-      }
-    }
-    modal.querySelector(`input[value=${defaultAction}]`).checked = true;
-
-    modal.classList.remove('hidden');
-    backdrop.classList.remove('hidden');
-  }
-
-  function closeImportModal() {
-    document.querySelector('#import-modal').classList.add('hidden');
-    document.querySelector('#modal-backdrop').classList.add('hidden');
-    pendingImportResult = null;
-  }
-
-  document.querySelector('#import-modal .cancel-btn').addEventListener('click', closeImportModal);
-  document.querySelector('#modal-backdrop').addEventListener('click', () => {
-    closeImportModal();
-    closeExportModal();
-    closeManageModal();
-  });
-
-  document.querySelector('#import-confirm').addEventListener('click', () => {
-    if (!pendingImportResult) { closeImportModal(); return; }
-    const action = document.querySelector('input[name=import-action]:checked')?.value;
-    const r = pendingImportResult;
-    const importedName = r.name || '';
-    if (action === 'replace-mine') {
-      replaceSaved(r.saved);
-      replacePurchased(r.purchased);
-      if (importedName) setMyName(importedName);
-    } else if (action === 'add-mine') {
-      const cur = getSaved();
-      for (const id of r.saved) cur.add(id);
-      replaceSaved(cur);
-      const curP = getPurchased();
-      for (const id of r.purchased) curP.add(id);
-      replacePurchased(curP);
-      if (importedName) setMyName(importedName);
-    } else if (action === 'replace-list') {
-      const id = document.querySelector('#replace-list-select').value;
-      if (!id) { alert('No friend\'s list selected.'); return; }
-      replaceCollection(id, {
-        saved: [...r.saved],
-        purchased: [...r.purchased],
-        originalExportName: importedName,
-      });
-    } else if (action === 'new-list') {
-      const name = document.querySelector('#new-list-name').value.trim();
-      if (!name) { alert('Please enter a name for the new friend\'s list.'); return; }
-      createCollection({
-        name,
-        saved: [...r.saved],
-        purchased: [...r.purchased],
-        originalExportName: importedName,
-      });
-    }
-    closeImportModal();
-    applyFilters();
-  });
-
-  // ── Export modal ──────────────────────────────────────────────────────────
-
-  function openExportModal() {
-    const modal = document.querySelector('#export-modal');
-    const backdrop = document.querySelector('#modal-backdrop');
-    const sources = modal.querySelector('#export-sources');
-    const collections = listCollections();
-    let html = `
-      <label class="action-row">
-        <input type="radio" name="export-source" value="mine" checked>
-        <span>My events (saved: ${getSaved().size}, purchased: ${getPurchased().size})</span>
-      </label>
-    `;
-    for (const c of collections) {
-      html += `
-        <label class="action-row">
-          <input type="radio" name="export-source" value="${escapeAttr(c.id)}">
-          <span><span class="swatch" style="background:${escapeAttr(c.color)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${escapeHtml(c.name)} (saved: ${c.saved.length}, purchased: ${c.purchased.length})</span>
-        </label>
-      `;
-    }
-    sources.innerHTML = html;
-    const nameInput = modal.querySelector('#export-name');
-    nameInput.value = getMyName();
-    sources.querySelectorAll('input[name=export-source]').forEach(r => {
-      r.addEventListener('change', () => {
-        if (r.value === 'mine') nameInput.value = getMyName();
-        else {
-          const c = getCollection(r.value);
-          nameInput.value = c ? c.name : '';
-        }
-      });
-    });
-    modal.classList.remove('hidden');
-    backdrop.classList.remove('hidden');
-  }
-
-  function closeExportModal() {
-    document.querySelector('#export-modal').classList.add('hidden');
-    document.querySelector('#modal-backdrop').classList.add('hidden');
-  }
-
-  document.querySelector('#export-modal .cancel-btn').addEventListener('click', closeExportModal);
-
-  // ── Manage modal ──────────────────────────────────────────────────────────
-
-  function openManageModal() {
-    const modal = document.querySelector('#manage-modal');
-    const backdrop = document.querySelector('#modal-backdrop');
-    renderManageRows();
-    modal.classList.remove('hidden');
-    backdrop.classList.remove('hidden');
-  }
-
-  function closeManageModal() {
-    document.querySelector('#manage-modal').classList.add('hidden');
-    document.querySelector('#modal-backdrop').classList.add('hidden');
-  }
-
-  function renderManageRows() {
-    const container = document.querySelector('#manage-rows');
-    const collections = listCollections();
-    if (collections.length === 0) {
-      container.innerHTML = '<p class="muted">No friend\'s lists yet.</p>';
-      return;
-    }
-    container.innerHTML = collections.map(c => {
-      const imported = (c.importedAt || '').slice(0, 10);
-      return `
-        <div class="manage-row" data-id="${escapeAttr(c.id)}">
-          <div class="manage-row-head">
-            <span class="swatch" style="background:${escapeAttr(c.color)}"></span>
-            <span class="name">${escapeHtml(c.name)}</span>
-          </div>
-          <div class="manage-row-meta">
-            ${c.saved.length} saved, ${c.purchased.length} purchased · imported ${imported}
-          </div>
-          <div class="manage-row-actions">
-            <button type="button" class="rename-btn">Rename</button>
-            <button type="button" class="export-btn">Export</button>
-            <button type="button" class="delete-btn">Delete</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-    container.querySelectorAll('.rename-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.target.closest('.manage-row').dataset.id;
-        const cur = getCollection(id);
-        const next = window.prompt('New name:', cur?.name || '');
-        if (next == null) return;
-        const trimmed = next.trim();
-        if (!trimmed) return;
-        renameCollection(id, trimmed);
-        renderManageRows();
-        renderFriendsLists();
-        applyFilters();
-      });
-    });
-    container.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.target.closest('.manage-row').dataset.id;
-        const cur = getCollection(id);
-        if (!window.confirm(`Delete "${cur?.name ?? id}"?`)) return;
-        deleteCollection(id);
-        state.activeListIds.delete(id);
-        renderManageRows();
-        renderFriendsLists();
-        applyFilters();
-      });
-    });
-    container.querySelectorAll('.export-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.target.closest('.manage-row').dataset.id;
-        closeManageModal();
-        openExportModal();
-        const radio = document.querySelector(`input[name=export-source][value="${id}"]`);
-        if (radio) {
-          radio.checked = true;
-          radio.dispatchEvent(new Event('change'));
-        }
-      });
-    });
-  }
-
-  document.querySelector('#manage-modal .cancel-btn').addEventListener('click', closeManageModal);
-
-  document.querySelector('#export-confirm').addEventListener('click', () => {
-    const sel = document.querySelector('input[name=export-source]:checked')?.value;
-    const name = document.querySelector('#export-name').value.trim();
-    let saved, purchased;
-    if (sel === 'mine') {
-      saved = getSaved();
-      purchased = getPurchased();
-    } else {
-      const c = getCollection(sel);
-      if (!c) return;
-      saved = new Set(c.saved);
-      purchased = new Set(c.purchased);
-    }
-    const csv = exportSchedule(blob.groups, saved, purchased, { name });
-    const today = new Date().toISOString().slice(0, 10);
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const fname = slug
-      ? `gencon-schedule-${slug}-${today}.csv`
-      : `gencon-schedule-${today}.csv`;
-    triggerDownload(fname, csv);
-    closeExportModal();
-  });
-
   // ─────────────────────────────────────────────────────────────────────────
 
   ensureDefaultTypes();
   renderAllFilterUI();
+  // installModals must run AFTER the rail is rendered — the rail contains
+  // #f-import / #f-export, the file-input and Export button that modals wires.
+  installModals({
+    blob,
+    applyFilters,
+    renderFriendsLists,
+    getState: () => state,
+  });
   applyFilters();
 }
+
 
 function escapeAttr(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({

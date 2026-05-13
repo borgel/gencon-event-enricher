@@ -76,6 +76,10 @@ export function buildPredicate(state, mineSaved, collections) {
     if (state.bggMin > 0) {
       if (!g.bgg || (g.bgg.bayesaverage ?? 0) < state.bggMin) return false;
     }
+    // Strict: an event must match the type filter. The UI defaults state.types
+    // to every known type, so an "empty" types set means the user explicitly
+    // chose Clear all and wants nothing. This contrasts with most other
+    // multi-select filters where empty = no constraint.
     if (!state.types.has(g.event_type)) return false;
     if (state.locations.size && !state.locations.has(matchLocation(g))) return false;
     if (state.tournament !== 'either') {

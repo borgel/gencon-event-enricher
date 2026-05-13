@@ -1572,6 +1572,77 @@ def test_detail_panel_no_also_saved_by_when_no_collection_has_event(server):
         browser.close()
 
 
+def test_session_card_shows_friend_chips_for_marked_session(server):
+    """Per-session chips: a session that a friend's list flagged gets a chip
+    inside its session-card (not just the group-level 'Also saved by:' line)
+    and the card carries the friend-marked class for visual highlight."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Alice flags the SEM session (SEM26ND000005).
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel .session-card.friend-marked")
+        # Chip with Alice's name + color appears inside the marked card.
+        chip = page.query_selector(
+            "#detail-panel .session-card.friend-marked .friend-chip"
+        )
+        assert chip is not None
+        assert chip.query_selector(".name").inner_text() == "Alice"
+        swatch_style = chip.query_selector(".swatch").get_attribute("style") or ""
+        assert "#e76f51" in swatch_style
+        # The card's inline left-border accent uses Alice's color.
+        card = page.query_selector("#detail-panel .session-card.friend-marked")
+        style = card.get_attribute("style") or ""
+        assert "#e76f51" in style
+        ctx.close()
+        browser.close()
+
+
+def test_session_card_no_chips_when_friend_only_marked_other_session(server):
+    """If a friend's list flagged a DIFFERENT session in the same group,
+    the unflagged session must NOT show chips. (Regression check that the
+    per-session filter actually intersects on gencon_id, not group key.)"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Alice flags an unrelated session id; the BGM/SEM cards in the
+        # current fixture must NOT show her chip.
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['NONEXISTENT-OTHER-SESSION'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel:not(.hidden)")
+        # No session-card should carry the friend-marked class.
+        assert page.query_selector("#detail-panel .session-card.friend-marked") is None
+        # And no chips inside any session-card.
+        assert page.query_selector("#detail-panel .session-card .friend-chip") is None
+        ctx.close()
+        browser.close()
+
+
 def test_import_modal_opens_with_summary(tmp_path, server):
     csv_path = tmp_path / "schedule.csv"
     csv_path.write_text(

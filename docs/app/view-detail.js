@@ -61,7 +61,7 @@ function render(g, perSessionOverlap, allCollections) {
     <h3 style="margin-top:14px;font-size:14px">Description</h3>
     <p>${escape(g.long_description || g.short_description)}</p>
     <h3 style="margin-top:14px;font-size:14px">Sessions (${g.sessions.length})</h3>
-    ${g.sessions.map(s => sessionCard(s, g, perSessionOverlap?.get(s.gencon_id))).join('')}
+    ${g.sessions.map(s => sessionCard(s, g, perSessionOverlap?.get(s.gencon_id), allCollections)).join('')}
   `;
 }
 
@@ -107,7 +107,7 @@ function categoryRank(ranks) {
   return ` · #${entry[1]} ${entry[0]}`;
 }
 
-function sessionCard(s, g, overlapInfo) {
+function sessionCard(s, g, overlapInfo, allCollections) {
   const start = new Date(s.start);
   const end = s.end ? new Date(s.end) : null;
   const saved = isSaved(s.gencon_id);
@@ -123,8 +123,29 @@ function sessionCard(s, g, overlapInfo) {
     ? `⚠️ Conflicts with ${escape(overlapInfo.conflictsWith[0].title)}`
     : '✓ Fits your schedule';
   const fitClass = overlapInfo && !overlapInfo.fits ? 'session-fit conflict' : 'session-fit';
+  // Which friends' lists have flagged THIS specific session (saved or
+  // purchased). Drives the per-session chips and the card's left-edge
+  // accent color.
+  const friendMatches = (allCollections || []).filter(c =>
+    (c.saved || []).includes(s.gencon_id) || (c.purchased || []).includes(s.gencon_id)
+  );
+  const friendChips = friendMatches.map(c => `
+    <span class="friend-chip" data-id="${escapeAttr(c.id)}" title="${escapeAttr(c.name)}">
+      <span class="swatch" style="background:${escapeAttr(c.color)}"></span>
+      <span class="name">${escape(c.name)}</span>
+    </span>
+  `).join('');
+  const cardClass = friendMatches.length > 0
+    ? `session-card friend-marked`
+    : 'session-card';
+  // First match's color drives a thin left-edge accent so the card pops
+  // visually even when chips are scrolled out of view.
+  const accentStyle = friendMatches.length > 0
+    ? ` style="border-left-color:${escapeAttr(friendMatches[0].color)};border-left-width:4px"`
+    : '';
   return `
-    <div class="session-card" data-session-id="${escape(s.gencon_id)}">
+    <div class="${cardClass}" data-session-id="${escape(s.gencon_id)}"${accentStyle}>
+      ${friendChips ? `<div class="friend-chips">${friendChips}</div>` : ''}
       <div class="session-when">${formatDay(start)} ${formatTime(start)}${end ? '–' + formatTime(end) : ''}</div>
       ${where ? `<div class="session-where">${where}</div>` : ''}
       <div class="session-meta">

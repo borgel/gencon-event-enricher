@@ -158,6 +158,39 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 #detail-panel .session-card .session-links a {
   text-decoration: none; margin-right: 4px;
 }
+
+/* When a friend's list has flagged this specific session, tint the card and
+   accent its left edge with the first matching collection's color. The
+   inline style="border-left-color:..." above takes precedence over the
+   var(--border) default below. */
+#detail-panel .session-card.friend-marked {
+  background: #fafbfd;
+}
+#detail-panel .session-card .friend-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+#detail-panel .session-card .friend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 1px 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--fg);
+}
+#detail-panel .session-card .friend-chip .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 .starred { color: #d97706; }
 
 #results-toolbar {

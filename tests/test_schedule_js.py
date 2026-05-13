@@ -269,3 +269,38 @@ def test_roundtrip_preserves_name(page):
     """
     obj = json.loads(_eval(page, js))
     assert obj["name"] == "Dave"
+
+
+def test_roundtrip_name_with_comma_survives(page):
+    """A collection name containing a comma must round-trip cleanly."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set(), {{name: 'Smith, Alice'}});
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{name: result.name, matched: result.matched}});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == "Smith, Alice"
+    assert obj["matched"] == 1
+
+
+def test_export_strips_newlines_from_name(page):
+    """An accidental newline in a name must not corrupt the file."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(
+      groups, new Set(['BGM26ND313243']), new Set(),
+      {{name: 'Alice\\nBob'}}
+    );
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{
+      firstLine: csv.split('\\n')[0],
+      name: result.name,
+      matched: result.matched,
+    }});
+    """
+    obj = json.loads(_eval(page, js))
+    # Newline must be collapsed; metadata stays on one line.
+    assert obj["firstLine"] == "# name=Alice Bob"
+    assert obj["name"] == "Alice Bob"
+    assert obj["matched"] == 1

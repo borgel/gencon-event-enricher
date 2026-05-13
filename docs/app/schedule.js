@@ -10,7 +10,10 @@
 
 export function exportSchedule(groups, saved, purchased, options = {}) {
   const rows = [];
-  if (options.name) rows.push([`# name=${options.name}`]);
+  if (options.name) {
+    const safeName = String(options.name).replace(/[\r\n]+/g, ' ').trim();
+    if (safeName) rows.push([`# name=${safeName}`]);
+  }
   rows.push(['event_id', 'gencon_id', 'title', 'when', 'saved', 'purchased']);
   for (const g of groups) {
     for (const s of g.sessions || []) {
@@ -38,26 +41,23 @@ export function exportSchedule(groups, saved, purchased, options = {}) {
 }
 
 export function parseScheduleCSV(text, groups) {
-  const allRows = parseCSV(text);
+  // Strip leading '#'-prefixed metadata lines BEFORE CSV tokenization so
+  // metadata values containing commas don't get mis-tokenized as cells.
+  const lines = text.split(/\r?\n/);
   let name = '';
-  let i = 0;
-  while (i < allRows.length) {
-    const r = allRows[i];
-    if (r.length === 1 && r[0].startsWith('#')) {
-      const meta = r[0].slice(1).trim(); // strip leading '#'
-      const eq = meta.indexOf('=');
-      if (eq > 0) {
-        const k = meta.slice(0, eq).trim();
-        const v = meta.slice(eq + 1).trim();
-        if (k === 'name') name = v;
-        // unknown keys ignored
-      }
-      i++;
-      continue;
+  let dataStart = 0;
+  while (dataStart < lines.length && lines[dataStart].startsWith('#')) {
+    const meta = lines[dataStart].slice(1).trim();
+    const eq = meta.indexOf('=');
+    if (eq > 0) {
+      const k = meta.slice(0, eq).trim();
+      const v = meta.slice(eq + 1).trim();
+      if (k === 'name') name = v;
+      // unknown keys ignored
     }
-    break;
+    dataStart++;
   }
-  const rows = allRows.slice(i);
+  const rows = parseCSV(lines.slice(dataStart).join('\n'));
   if (rows.length < 2) {
     return { name, saved: new Set(), purchased: new Set(), matched: 0, missed: 0 };
   }

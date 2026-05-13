@@ -1234,3 +1234,65 @@ def test_phone_body_scroll_locked_when_detail_open(server):
         assert restored != "hidden"
         ctx.close()
         browser.close()
+
+
+def test_friends_lists_section_appears_with_collections(server):
+    """Pre-populating localStorage.collections.v1 makes the rail section render."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Seed a collection that flags the SEM session.
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-test1111',
+                name: 'Alice',
+                color: '#e76f51',
+                saved: ['SEM26ND000005'],
+                purchased: [],
+                importedAt: '2026-05-13T00:00:00Z',
+                originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists")
+        # Section heading and the one collection row exist.
+        assert page.query_selector("#friends-lists h4") is not None
+        rows = page.query_selector_all("#friends-lists .friend-list-row")
+        assert len(rows) == 1
+        # Color swatch matches.
+        sw = page.query_selector("#friends-lists .friend-list-row .swatch")
+        assert sw.get_attribute("style") and "#e76f51" in sw.get_attribute("style")
+        # Name visible
+        name_el = page.query_selector("#friends-lists .friend-list-row .name")
+        assert name_el.inner_text() == "Alice"
+        # Clicking the checkbox toggles activeListIds in state.
+        cb = page.query_selector("#friends-lists .friend-list-row input[type=checkbox]")
+        cb.click()
+        # The list view should now show only events Alice flagged (the SEM row).
+        page.wait_for_function(
+            "document.querySelectorAll('#results-list .row').length === 1"
+        )
+        ctx.close()
+        browser.close()
+
+
+def test_friends_lists_section_hidden_when_no_collections(server):
+    """No section when no collections exist."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Clear any test residue
+        page.evaluate("localStorage.removeItem('gencon-enricher.collections.v1')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        assert page.query_selector("#friends-lists") is None
+        ctx.close()
+        browser.close()

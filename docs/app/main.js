@@ -94,6 +94,7 @@ function renderFilterRail(state, onChange) {
       <label><input type="checkbox" id="f-tix" ${state.ticketsOnly?'checked':''}> Tickets available</label><br>
       <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label>
     </div>
+    <section id="friends-lists" class="rail-section hidden"></section>
     <div class="group">
       <button id="f-clear" type="button">Clear filters</button>
     </div>
@@ -264,6 +265,50 @@ async function main() {
     });
   }
 
+  function renderFriendsLists() {
+    const container = document.querySelector('#friends-lists');
+    if (!container) return;
+    const collections = listCollections();
+    if (collections.length === 0) {
+      container.remove();
+      return;
+    }
+    container.classList.remove('hidden');
+    const rowsHtml = collections.map(c => {
+      const checked = state.activeListIds.has(c.id) ? 'checked' : '';
+      const total = c.saved.length + c.purchased.length;
+      return `
+        <label class="friend-list-row" data-id="${c.id}">
+          <input type="checkbox" ${checked} data-id="${c.id}">
+          <span class="swatch" style="background:${c.color}"></span>
+          <span class="name">${escapeHtml(c.name)}</span>
+          <span class="count">${total}</span>
+        </label>
+      `;
+    }).join('');
+    container.innerHTML = `
+      <h4>Friend's Lists</h4>
+      ${rowsHtml}
+      <a class="manage-link" href="#" id="manage-collections-link">Manage…</a>
+    `;
+    container.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+      cb.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        if (e.target.checked) state.activeListIds.add(id);
+        else state.activeListIds.delete(id);
+        applyFilters();
+      });
+    });
+    // Manage link: placeholder until Task 11 wires the modal.
+    const manageLink = container.querySelector('#manage-collections-link');
+    if (manageLink) {
+      manageLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('manage clicked');
+      });
+    }
+  }
+
   function attachScheduleHandlers() {
     document.querySelector('#f-export').addEventListener('click', () => {
       const csv = exportSchedule(blob.groups, getSaved(), getPurchased());
@@ -314,6 +359,7 @@ async function main() {
   // back/forward navigation).
   function renderAllFilterUI() {
     renderFilterRail(state, applyFilters);
+    renderFriendsLists();
     populateMultiselect('f-types', uniqueTypes, state.types, applyFilters, typeLabels);
     populateMultiselect('f-locations', uniqueLocations, state.locations, applyFilters);
     renderResultsToolbar(state, applyFilters);
@@ -405,6 +451,7 @@ async function main() {
       `${blob.meta.stats.unmatched.toLocaleString()} unmatched in dataset`;
     const hash = stateToHash(state, { allTypes: uniqueTypes });
     history.replaceState(null, '', hash ? `#${hash}` : '#');
+    renderFriendsLists();
   }
 
   window.addEventListener('popstate', () => {
@@ -421,6 +468,12 @@ async function main() {
 
 function escapeAttr(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }

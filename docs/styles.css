@@ -314,6 +314,45 @@ body.drawer-open #drawer-backdrop {
   display: block;
 }
 
+#friends-lists {
+  margin: 0.6rem 0;
+}
+#friends-lists.hidden { display: none; }
+#friends-lists h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a6f78;
+  margin: 0 0 0.35rem 0;
+}
+#friends-lists .friend-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+#friends-lists .friend-list-row .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+#friends-lists .friend-list-row .name { flex: 1; }
+#friends-lists .friend-list-row .count {
+  color: #6a6f78;
+  font-size: 12px;
+}
+#friends-lists .manage-link {
+  font-size: 11px;
+  color: #4a6cf7;
+  text-decoration: none;
+  margin-top: 0.3rem;
+  display: inline-block;
+}
+
 /* ----- Phone breakpoint ----- */
 @media (max-width: 768px) {
   #hamburger {

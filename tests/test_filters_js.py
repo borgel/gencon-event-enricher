@@ -106,7 +106,7 @@ def test_predicate_filters_by_type(page):
     js = """
     const s = F.defaultState();
     s.types = new Set(['BGM']);
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return JSON.stringify({
       bgm: p({ event_type: 'BGM', sessions: [{ start: '2026-07-30T09:00', tickets_available: 8 }] }),
       rpg: p({ event_type: 'RPG', sessions: [{ start: '2026-07-30T09:00', tickets_available: 8 }] }),
@@ -151,7 +151,7 @@ def test_bggmatch_yes_keeps_only_matched(page):
     s.bggMatch = 'yes';
     s.ticketsOnly = false;
     s.types = new Set(['BGM']);  // strict-types semantics: must include test event's type
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
                   sessions: [{ start: '2026-07-30T09:00' }] }),
@@ -170,7 +170,7 @@ def test_bggmatch_no_keeps_only_unmatched(page):
     s.bggMatch = 'no';
     s.ticketsOnly = false;
     s.types = new Set(['BGM']);
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
                   sessions: [{ start: '2026-07-30T09:00' }] }),
@@ -189,7 +189,7 @@ def test_bggmatch_either_is_no_op(page):
     s.bggMatch = 'either';
     s.ticketsOnly = false;
     s.types = new Set(['BGM']);
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return JSON.stringify({
       hasBgg: p({ event_type: 'BGM', bgg: { bayesaverage: 7 },
                   sessions: [{ start: '2026-07-30T09:00' }] }),
@@ -222,7 +222,7 @@ def test_duration_range_keeps_in_band(page):
     s.durMaxH = 4;
     s.ticketsOnly = false;
     s.types = new Set(['BGM']);
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return JSON.stringify({
       shortG:  p({ event_type: 'BGM', duration_minutes: 60,
                    sessions: [{ start: '2026-07-30T09:00' }] }),
@@ -246,7 +246,7 @@ def test_duration_max_12_means_unbounded(page):
     s.durMaxH = 12;
     s.ticketsOnly = false;
     s.types = new Set(['BGM']);
-    const p = F.buildPredicate(s, new Set());
+    const p = F.buildPredicate(s, new Set(), []);
     return p({ event_type: 'BGM', duration_minutes: 1080,
                sessions: [{ start: '2026-07-30T09:00' }] });
     """
@@ -356,3 +356,82 @@ def test_view_mode_hash_roundtrip(page):
     obj = json.loads(_eval(page, js))
     assert "view=timeline" in obj["h"]
     assert obj["viewMode"] == "timeline"
+
+
+def test_default_state_has_mine_and_listids(page):
+    s = _eval(page, """
+      const d = F.defaultState();
+      return JSON.stringify({
+        mineActive: d.mineActive,
+        activeListIds: [...d.activeListIds],
+        hasSavedOnly: 'savedOnly' in d,
+      });
+    """)
+    obj = json.loads(s)
+    assert obj["mineActive"] is False
+    assert obj["activeListIds"] == []
+    assert obj["hasSavedOnly"] is False
+
+
+def test_predicate_union_mine_or_list(page):
+    s = _eval(page, """
+      const state = { ...F.defaultState(),
+        mineActive: true,
+        activeListIds: new Set(['c-aaaa1111']),
+      };
+      // Force types to allow both groups through other filters.
+      state.types = new Set(['BGM','SEM']);
+      const mineSaved = new Set(['s-mine']);
+      const collections = [
+        { id:'c-aaaa1111', saved:['s-friend'], purchased:[] },
+      ];
+      const g1 = { event_type:'BGM', sessions:[{gencon_id:'s-mine', tickets_available: 1, start:'2026-07-30T09:00'}] };
+      const g2 = { event_type:'BGM', sessions:[{gencon_id:'s-friend', tickets_available: 1, start:'2026-07-30T09:00'}] };
+      const g3 = { event_type:'BGM', sessions:[{gencon_id:'s-other', tickets_available: 1, start:'2026-07-30T09:00'}] };
+      const pred = F.buildPredicate(state, mineSaved, collections);
+      return JSON.stringify({g1: pred(g1), g2: pred(g2), g3: pred(g3)});
+    """)
+    obj = json.loads(s)
+    assert obj == {"g1": True, "g2": True, "g3": False}
+
+
+def test_predicate_no_sources_passes_everything(page):
+    """No mineActive, no activeListIds → no saved-filter applied."""
+    s = _eval(page, """
+      const state = { ...F.defaultState(), types: new Set(['BGM']) };
+      const mineSaved = new Set();
+      const collections = [];
+      const pred = F.buildPredicate(state, mineSaved, collections);
+      const g = { event_type:'BGM', sessions:[{gencon_id:'s-x', tickets_available: 1, start:'2026-07-30T09:00'}] };
+      return JSON.stringify({pass: pred(g)});
+    """)
+    obj = json.loads(s)
+    assert obj == {"pass": True}
+
+
+def test_hash_includes_lists(page):
+    s = _eval(page, """
+      const state = { ...F.defaultState(),
+        types: new Set(),
+        mineActive: true,
+        activeListIds: new Set(['c-aaaa1111','c-bbbb2222']),
+      };
+      const h = F.stateToHash(state);
+      return JSON.stringify({h});
+    """)
+    obj = json.loads(s)
+    assert "saved=1" in obj["h"]
+    assert "lists=c-aaaa1111,c-bbbb2222" in obj["h"]
+
+
+def test_hash_to_state_parses_lists(page):
+    s = _eval(page, """
+      const state = F.hashToState('#saved=1&lists=c-aaaa1111,c-bbbb2222');
+      return JSON.stringify({
+        mineActive: state.mineActive,
+        listIds: [...state.activeListIds].sort(),
+      });
+    """)
+    obj = json.loads(s)
+    assert obj["mineActive"] is True
+    assert obj["listIds"] == ["c-aaaa1111", "c-bbbb2222"]

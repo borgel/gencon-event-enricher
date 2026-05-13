@@ -397,6 +397,12 @@ async function main() {
     }
     const mineSaved = new Set([...saved, ...purchased]);
     const collections = listCollections();
+    // Drop stale collection IDs (e.g., from a shared URL referencing a since-
+    // deleted list) so they don't haunt the hash forever.
+    const validIds = new Set(collections.map(c => c.id));
+    for (const id of [...state.activeListIds]) {
+      if (!validIds.has(id)) state.activeListIds.delete(id);
+    }
     const pred = buildPredicate(state, mineSaved, collections);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);

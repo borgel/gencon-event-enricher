@@ -471,7 +471,10 @@ body.drawer-open #drawer-backdrop {
   gap: 0.3rem;
   padding: 0.15rem 0.5rem;
   background: #f0f2f7;
+  border: none;
   border-radius: 12px;
+  cursor: default;
+  margin: 0;
 }
 .also-saved-by .chip .swatch {
   width: 8px;

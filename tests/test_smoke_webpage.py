@@ -1394,3 +1394,52 @@ def test_timeline_blocks_show_friend_dots(server):
         assert any("#e76f51" in s for s in styles), "expected Alice's color on a dot"
         ctx.close()
         browser.close()
+
+
+def test_detail_panel_lists_collections_that_have_event(server):
+    """Detail panel shows an 'Also saved by' chip per collection containing the event."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Click the SEM (Cosplay 101) row to open its detail panel.
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel .also-saved-by")
+        chips = page.query_selector_all("#detail-panel .also-saved-by .chip")
+        assert len(chips) == 1
+        sw = page.query_selector("#detail-panel .also-saved-by .chip .swatch")
+        assert sw.get_attribute("style") and "#e76f51" in sw.get_attribute("style")
+        name = page.query_selector("#detail-panel .also-saved-by .chip .name")
+        assert name.inner_text() == "Alice"
+        ctx.close()
+        browser.close()
+
+
+def test_detail_panel_no_also_saved_by_when_no_collection_has_event(server):
+    """No chip block when no collection contains any session of the event."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate("localStorage.removeItem('gencon-enricher.collections.v1')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel:not(.hidden)")
+        assert page.query_selector("#detail-panel .also-saved-by") is None
+        ctx.close()
+        browser.close()

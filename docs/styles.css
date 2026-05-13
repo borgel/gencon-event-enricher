@@ -452,3 +452,30 @@ body.drawer-open #drawer-backdrop {
     grid-template-columns: 28px 1fr 80px 50px 56px;
   }
 }
+
+.also-saved-by {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0;
+  font-size: 13px;
+}
+.also-saved-by .label {
+  color: #6a6f78;
+  font-size: 12px;
+}
+.also-saved-by .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  background: #f0f2f7;
+  border-radius: 12px;
+}
+.also-saved-by .chip .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}

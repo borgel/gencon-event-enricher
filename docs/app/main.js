@@ -241,7 +241,7 @@ async function main() {
     container: $('#results-list'),
     onRowClick: (key) => {
       const g = groupsByKey.get(key);
-      detailView.show(g, latestOverlap.perSession);
+      detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() });
     },
   });
   const detailView = createDetailView({
@@ -252,14 +252,14 @@ async function main() {
   });
   const timelineView = createTimelineView({
     container: $('#results-timeline'),
-    onEventClick: (g) => detailView.show(g, latestOverlap.perSession),
+    onEventClick: (g) => detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() }),
   });
 
   function attachLuckyHandler() {
     document.querySelector('#s-lucky').addEventListener('click', () => {
       if (!lastVisibleGroups.length) return;
       const g = lastVisibleGroups[Math.floor(Math.random() * lastVisibleGroups.length)];
-      detailView.show(g, latestOverlap.perSession);
+      detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() });
       tableView.scrollToKey(g.key);
       tableView.setSelectedKey(g.key);
     });
@@ -401,7 +401,7 @@ async function main() {
     const overlapInfo = groupOverlapMap(blob.groups, saved, purchased);
     latestOverlap = overlapInfo;
     if (openGroup) {
-      detailView.show(openGroup, overlapInfo.perSession);
+      detailView.show(openGroup, overlapInfo.perSession, { allCollections: listCollections() });
     }
     const mineSaved = new Set([...saved, ...purchased]);
     const collections = listCollections();

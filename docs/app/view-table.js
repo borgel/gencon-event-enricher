@@ -107,7 +107,22 @@ function formatMarks(g, userState) {
   const saved = userState?.saved && g.sessions?.some(s => userState.saved.has(s.gencon_id));
   const purchased = userState?.purchased && g.sessions?.some(s => userState.purchased.has(s.gencon_id));
   const conflict = userState?.conflicts && userState.conflicts.has(g.key);
-  return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
+  const visibleCollections = userState?.visibleCollections || [];
+  const matches = visibleCollections.filter(c =>
+    g.sessions?.some(s => c.saved.includes(s.gencon_id) || c.purchased.includes(s.gencon_id))
+  );
+  const shown = matches.slice(0, 3);
+  const extra = matches.length - shown.length;
+  let dotsHtml = '';
+  for (const c of shown) {
+    dotsHtml += `<span class="friend-dot" style="background:${c.color}" title="${escapeAttr(c.name)}"></span>`;
+  }
+  if (extra > 0) dotsHtml += `<span class="friend-dot-more">+${extra}</span>`;
+  return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}${dotsHtml}`;
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 export function formatWhen(g) {

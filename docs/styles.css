@@ -353,6 +353,22 @@ body.drawer-open #drawer-backdrop {
   display: inline-block;
 }
 
+.marks .friend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+.marks .friend-dot-more {
+  display: inline-block;
+  font-size: 10px;
+  color: #6a6f78;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
 /* ----- Phone breakpoint ----- */
 @media (max-width: 768px) {
   #hamburger {

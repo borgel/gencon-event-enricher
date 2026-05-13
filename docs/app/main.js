@@ -422,10 +422,15 @@ async function main() {
     if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');
     document.body.classList.toggle('timeline-on', state.viewMode === 'timeline');
     // List is always visible and always in sync with the predicate.
+    const anySourceActive = state.mineActive || state.activeListIds.size > 0;
+    const visibleCollections = anySourceActive
+      ? collections.filter(c => state.activeListIds.has(c.id))
+      : collections;
     tableView.setRows(visible, {
       saved,
       purchased,
       conflicts: latestOverlap.conflictedGroups,
+      visibleCollections,
     });
     // Timeline is an additional side-by-side panel, toggled by viewMode.
     if (state.viewMode === 'timeline') {

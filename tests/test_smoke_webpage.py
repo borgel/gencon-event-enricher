@@ -1300,3 +1300,67 @@ def test_friends_lists_section_hidden_when_no_collections(server):
         assert (el.inner_text() or "").strip() == ""
         ctx.close()
         browser.close()
+
+
+def test_row_badges_show_for_active_collection(server):
+    """When Alice's checkbox is on, the SEM row shows her colored dot."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row input[type=checkbox]")
+        # Check Alice's box.
+        page.click("#friends-lists .friend-list-row input[type=checkbox]")
+        # The SEM row's marks cell should now contain a dot with Alice's color.
+        page.wait_for_selector("#results-list .row .marks .friend-dot")
+        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
+        styles = [d.get_attribute("style") or "" for d in dots]
+        assert any("#e76f51" in s for s in styles)
+        titles = [d.get_attribute("title") or "" for d in dots]
+        assert "Alice" in titles
+        ctx.close()
+        browser.close()
+
+
+def test_row_badges_hidden_when_collection_unchecked_and_others_active(server):
+    """If Alice unchecked AND Mine active, Alice's dot does NOT show."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            localStorage.setItem('gencon-enricher.saved.v2', JSON.stringify(['SEM26ND000005']));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Mine is active (★ on), Alice unchecked.
+        page.click("#s-saved")
+        # Wait for filter to apply.
+        page.wait_for_function(
+            "document.querySelectorAll('#results-list .row').length === 1"
+        )
+        # No friend-dot for Alice (her checkbox is off).
+        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
+        assert len(dots) == 0
+        ctx.close()
+        browser.close()

@@ -8,6 +8,7 @@ import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
+import { listCollections } from './collections.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -152,7 +153,7 @@ function renderResultsToolbar(state, onChange) {
     </div>
     <div class="toolbar-right">
       <button id="s-timeline" type="button" class="${state.viewMode === 'timeline' ? 'active' : ''}">🗓️ Timeline</button>
-      <button id="s-saved" type="button" class="${state.savedOnly ? 'active' : ''}">★ Saved (0)</button>
+      <button id="s-saved" type="button" class="${state.mineActive ? 'active' : ''}">★ Saved (0)</button>
       <button id="s-lucky" type="button" disabled>🎲 I'm Feeling Lucky</button>
     </div>
   `;
@@ -171,7 +172,7 @@ function renderResultsToolbar(state, onChange) {
     onChange();
   });
   document.querySelector('#s-saved').addEventListener('click', () => {
-    state.savedOnly = !state.savedOnly;
+    state.mineActive = !state.mineActive;
     onChange();
   });
   document.querySelector('#s-timeline').addEventListener('click', () => {
@@ -356,7 +357,9 @@ async function main() {
     if (openGroup) {
       detailView.show(openGroup, overlapInfo.perSession);
     }
-    const pred = buildPredicate(state, saved);
+    const mineSaved = new Set([...saved, ...purchased]);
+    const collections = listCollections();
+    const pred = buildPredicate(state, mineSaved, collections);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);
     if (hits) visible = visible.filter(g => hits.has(g.key));
@@ -367,7 +370,7 @@ async function main() {
     const savedBtn = document.querySelector('#s-saved');
     if (savedBtn) {
       savedBtn.textContent = `★ Saved (${saved.size})`;
-      savedBtn.classList.toggle('active', state.savedOnly);
+      savedBtn.classList.toggle('active', state.mineActive);
     }
     const tlBtn = document.querySelector('#s-timeline');
     if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');

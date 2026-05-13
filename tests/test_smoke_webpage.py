@@ -1120,7 +1120,7 @@ def test_header_stacks_above_list(server):
 
 
 def test_row_columns_b_aligned(server):
-    """Row uses the new grid template — marks · title · type · when · tix · bgg."""
+    """Row uses the grid template — friend-stripe · marks · title · type · when · tix · bgg."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
@@ -1130,7 +1130,7 @@ def test_row_columns_b_aligned(server):
             ".row",
             "e => [...e.children].map(c => c.className.split(' ')[0])",
         )
-        assert cell_classes == ["marks", "title", "type", "when", "tix", "bgg"]
+        assert cell_classes == ["friend-stripe", "marks", "title", "type", "when", "tix", "bgg"]
         browser.close()
 
 
@@ -1430,7 +1430,7 @@ def test_friends_lists_section_hidden_when_no_collections(server):
 
 
 def test_row_badges_show_for_active_collection(server):
-    """When Alice's checkbox is on, the SEM row shows her colored dot."""
+    """When Alice's checkbox is on, the SEM row shows her colored stripe segment."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
@@ -1450,19 +1450,19 @@ def test_row_badges_show_for_active_collection(server):
         page.wait_for_selector("#friends-lists .friend-list-row input[type=checkbox]")
         # Check Alice's box.
         page.click("#friends-lists .friend-list-row input[type=checkbox]")
-        # The SEM row's marks cell should now contain a dot with Alice's color.
-        page.wait_for_selector("#results-list .row .marks .friend-dot")
-        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
-        styles = [d.get_attribute("style") or "" for d in dots]
+        # The SEM row's stripe column should now contain a segment with Alice's color.
+        page.wait_for_selector("#results-list .row .friend-stripe .stripe-seg")
+        segs = page.query_selector_all("#results-list .row .friend-stripe .stripe-seg")
+        styles = [s.get_attribute("style") or "" for s in segs]
         assert any("#e76f51" in s for s in styles)
-        titles = [d.get_attribute("title") or "" for d in dots]
+        titles = [s.get_attribute("title") or "" for s in segs]
         assert "Alice" in titles
         ctx.close()
         browser.close()
 
 
 def test_row_badges_hidden_when_collection_unchecked_and_others_active(server):
-    """If Alice unchecked AND Mine active, Alice's dot does NOT show."""
+    """If Alice unchecked AND Mine active, Alice's stripe does NOT show."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
@@ -1486,9 +1486,9 @@ def test_row_badges_hidden_when_collection_unchecked_and_others_active(server):
         page.wait_for_function(
             "document.querySelectorAll('#results-list .row').length === 1"
         )
-        # No friend-dot for Alice (her checkbox is off).
-        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
-        assert len(dots) == 0
+        # No friend stripe segment for Alice (her checkbox is off).
+        segs = page.query_selector_all("#results-list .row .friend-stripe .stripe-seg")
+        assert len(segs) == 0
         ctx.close()
         browser.close()
 

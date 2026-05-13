@@ -93,6 +93,7 @@ function makeRow(g, userState) {
     row.classList.add('conflict');
   }
   row.innerHTML = `
+    <span class="friend-stripe row-cell">${formatStripe(g, userState)}</span>
     <span class="marks row-cell">${formatMarks(g, userState)}</span>
     <span class="title row-cell">${escape(g.title)}</span>
     <span class="type row-cell">${escape(g.event_type)}</span>
@@ -107,18 +108,23 @@ function formatMarks(g, userState) {
   const saved = userState?.saved && g.sessions?.some(s => userState.saved.has(s.gencon_id));
   const purchased = userState?.purchased && g.sessions?.some(s => userState.purchased.has(s.gencon_id));
   const conflict = userState?.conflicts && userState.conflicts.has(g.key);
+  return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}`;
+}
+
+// Horizontal segments at the row's left edge, one per friend's list that
+// flagged this event. Identity is hover-revealed via the title attribute.
+function formatStripe(g, userState) {
   const visibleCollections = userState?.visibleCollections || [];
   const matches = visibleCollections.filter(c =>
     g.sessions?.some(s => c.saved.includes(s.gencon_id) || c.purchased.includes(s.gencon_id))
   );
-  const shown = matches.slice(0, 3);
-  const extra = matches.length - shown.length;
-  let dotsHtml = '';
-  for (const c of shown) {
-    dotsHtml += `<span class="friend-dot" style="background:${escapeAttr(c.color)}" title="${escapeAttr(c.name)}"></span>`;
-  }
-  if (extra > 0) dotsHtml += `<span class="friend-dot-more">+${extra}</span>`;
-  return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}${dotsHtml}`;
+  if (matches.length === 0) return '';
+  // Cap visible segments at 4 to keep each bar readable; remaining friends
+  // can be confirmed in the detail panel's "Also saved by" chips.
+  const shown = matches.slice(0, 4);
+  return shown.map(c =>
+    `<span class="stripe-seg" style="background:${escapeAttr(c.color)}" title="${escapeAttr(c.name)}"></span>`
+  ).join('');
 }
 
 function escapeAttr(s) {

@@ -57,10 +57,10 @@ export function assignNextColor(existingColors) {
   for (const c of FRIEND_PALETTE) {
     if (!used.has(c)) return c;
   }
-  // Palette exhausted; cycle by hashing a unique input.
-  // Caller passes a salt via assignNextColorWithSalt for determinism;
-  // here we fall back to a random palette slot.
-  return FRIEND_PALETTE[Math.floor(Math.random() * FRIEND_PALETTE.length)];
+  // Palette exhausted. Deterministically pick a slot by hashing the existing
+  // colors so the answer is stable across calls with the same input.
+  const salt = [...used].sort().join('|');
+  return FRIEND_PALETTE[hashIndex(salt, FRIEND_PALETTE.length)];
 }
 
 function assignColorForNew(id, existingColors) {

@@ -1169,8 +1169,10 @@ def test_phone_hamburger_toggles_drawer(server):
         browser.close()
 
 
-def test_desktop_hamburger_hidden(server):
-    """At desktop width: hamburger is display: none."""
+def test_desktop_hamburger_visible(server):
+    """At desktop width the hamburger is now visible and toggles the rail
+    rather than the mobile drawer. (Was display:none before the rail-collapse
+    feature.)"""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1280, "height": 800})
@@ -1180,7 +1182,7 @@ def test_desktop_hamburger_hidden(server):
         ham_display = page.eval_on_selector(
             "#hamburger", "e => getComputedStyle(e).display"
         )
-        assert ham_display == "none"
+        assert ham_display != "none"
         ctx.close()
         browser.close()
 
@@ -1639,6 +1641,115 @@ def test_session_card_no_chips_when_friend_only_marked_other_session(server):
         assert page.query_selector("#detail-panel .session-card.friend-marked") is None
         # And no chips inside any session-card.
         assert page.query_selector("#detail-panel .session-card .friend-chip") is None
+        ctx.close()
+        browser.close()
+
+
+def test_hamburger_collapses_rail_on_desktop(server):
+    """On desktop the hamburger toggles body.rail-collapsed; the rail hides."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        assert "rail-collapsed" not in (page.eval_on_selector("body", "e => e.className") or "")
+        rail_display_before = page.eval_on_selector(
+            "#filter-rail", "e => getComputedStyle(e).display"
+        )
+        assert rail_display_before != "none"
+        page.click("#hamburger")
+        page.wait_for_function(
+            "document.body.classList.contains('rail-collapsed')"
+        )
+        rail_display_after = page.eval_on_selector(
+            "#filter-rail", "e => getComputedStyle(e).display"
+        )
+        assert rail_display_after == "none"
+        page.click("#hamburger")
+        page.wait_for_function(
+            "!document.body.classList.contains('rail-collapsed')"
+        )
+        rail_display_restored = page.eval_on_selector(
+            "#filter-rail", "e => getComputedStyle(e).display"
+        )
+        assert rail_display_restored != "none"
+        ctx.close()
+        browser.close()
+
+
+def test_hamburger_keeps_drawer_behavior_on_phone(server):
+    """At phone width, hamburger still toggles the slide-in drawer, NOT
+    rail-collapsed. Regression check for the dual-purpose button."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 375, "height": 700})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#hamburger")
+        page.wait_for_function(
+            "document.body.classList.contains('drawer-open')"
+        )
+        body_classes = page.eval_on_selector("body", "e => e.className")
+        assert "rail-collapsed" not in body_classes
+        ctx.close()
+        browser.close()
+
+
+def test_narrow_window_hides_list_when_timeline_and_detail_open(server):
+    """When window is narrow, timeline is on, AND a detail panel is open,
+    the event list should hide to make room for timeline + detail panel."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1000, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate("location.hash = 'view=timeline'")
+        page.wait_for_selector("#results-timeline:not(.hidden)")
+        list_display_before = page.eval_on_selector(
+            "#results-list-wrap", "e => getComputedStyle(e).display"
+        )
+        assert list_display_before != "none"
+        page.click(".row")
+        page.wait_for_function(
+            "document.body.classList.contains('detail-open')"
+        )
+        page.wait_for_function(
+            "getComputedStyle(document.querySelector('#results-list-wrap')).display === 'none'"
+        )
+        page.click("#detail-panel .close")
+        page.wait_for_function(
+            "!document.body.classList.contains('detail-open')"
+        )
+        list_display_after_close = page.eval_on_selector(
+            "#results-list-wrap", "e => getComputedStyle(e).display"
+        )
+        assert list_display_after_close != "none"
+        ctx.close()
+        browser.close()
+
+
+def test_wide_window_keeps_list_visible_with_timeline_and_detail(server):
+    """At wide widths, even with timeline + detail open, the list stays
+    visible — the auto-hide only kicks in at narrow viewports."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={"width": 1400, "height": 800})
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate("location.hash = 'view=timeline'")
+        page.wait_for_selector("#results-timeline:not(.hidden)")
+        page.click(".row")
+        page.wait_for_function(
+            "document.body.classList.contains('detail-open')"
+        )
+        list_display = page.eval_on_selector(
+            "#results-list-wrap", "e => getComputedStyle(e).display"
+        )
+        assert list_display != "none"
         ctx.close()
         browser.close()
 

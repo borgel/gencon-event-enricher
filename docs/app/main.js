@@ -200,16 +200,22 @@ async function main() {
   const blob = await loadData();
   renderHeaderMeta(blob.meta);
 
-  // Drawer toggle — only meaningful at phone width but the listeners are
-  // safe to attach unconditionally (the hamburger is display:none on desktop).
+  // Hamburger dual-purpose:
+  //   - At phone width: toggles the slide-in filter drawer.
+  //   - On desktop: toggles body.rail-collapsed to hide the filter rail
+  //     entirely, giving the list/timeline/detail panel more room.
   function setLockScroll() {
     const open = document.body.classList.contains('drawer-open')
               || !document.querySelector('#detail-panel').classList.contains('hidden');
     document.body.classList.toggle('lock-scroll', open);
   }
   $('#hamburger').addEventListener('click', () => {
-    document.body.classList.toggle('drawer-open');
-    setLockScroll();
+    if (matchMedia('(max-width: 768px)').matches) {
+      document.body.classList.toggle('drawer-open');
+      setLockScroll();
+    } else {
+      document.body.classList.toggle('rail-collapsed');
+    }
   });
   $('#drawer-backdrop').addEventListener('click', () => {
     document.body.classList.remove('drawer-open');
@@ -247,8 +253,18 @@ async function main() {
   const detailView = createDetailView({
     panel: $('#detail-panel'),
     onChange: () => applyFilters(),
-    onShow: (g) => { openGroup = g; setLockScroll(); applyFilters(); },
-    onClose: () => { openGroup = null; setLockScroll(); applyFilters(); },
+    onShow: (g) => {
+      openGroup = g;
+      document.body.classList.add('detail-open');
+      setLockScroll();
+      applyFilters();
+    },
+    onClose: () => {
+      openGroup = null;
+      document.body.classList.remove('detail-open');
+      setLockScroll();
+      applyFilters();
+    },
   });
   const timelineView = createTimelineView({
     container: $('#results-timeline'),

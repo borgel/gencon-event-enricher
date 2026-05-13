@@ -349,9 +349,11 @@ body.lock-scroll {
   overflow: hidden;
 }
 
-/* Hamburger button is hidden on desktop; visible only on phone via media query below. */
+/* Hamburger is always visible. On phone it toggles the slide-in drawer; on
+   desktop it toggles the rail-collapsed body class which hides the rail
+   entirely (more room for list/timeline/detail). */
 #hamburger {
-  display: none;
+  display: inline-block;
   font: inherit;
   font-size: 18px;
   background: none;
@@ -360,6 +362,13 @@ body.lock-scroll {
   padding: 2px 8px;
   margin-right: 8px;
   cursor: pointer;
+}
+
+/* Rail-collapsed (desktop only — mobile uses the drawer mechanic instead).
+   Hides the rail entirely and reclaims its grid column. */
+@media (min-width: 769px) {
+  body.rail-collapsed #filter-rail { display: none; }
+  body.rail-collapsed #app-shell { grid-template-columns: 1fr; }
 }
 
 /* Drawer backdrop covers content when drawer is open. */
@@ -430,6 +439,14 @@ body.drawer-open #drawer-backdrop {
 .row .friend-stripe .stripe-seg {
   flex: 1 1 0;
   min-width: 0;
+}
+
+/* ----- Narrow desktop: hide the list when the detail panel is open in
+   timeline view, so the timeline + detail can use the whole width. The
+   list becomes redundant in this configuration anyway — you're navigating
+   the schedule, not the search results. ----- */
+@media (max-width: 1100px) {
+  body.timeline-on.detail-open #results-list-wrap { display: none; }
 }
 
 /* ----- Phone breakpoint ----- */

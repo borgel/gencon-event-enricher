@@ -115,7 +115,7 @@ function formatMarks(g, userState) {
   const extra = matches.length - shown.length;
   let dotsHtml = '';
   for (const c of shown) {
-    dotsHtml += `<span class="friend-dot" style="background:${c.color}" title="${escapeAttr(c.name)}"></span>`;
+    dotsHtml += `<span class="friend-dot" style="background:${escapeAttr(c.color)}" title="${escapeAttr(c.name)}"></span>`;
   }
   if (extra > 0) dotsHtml += `<span class="friend-dot-more">+${extra}</span>`;
   return `${conflict ? '⚠️' : ''}${purchased ? '🎟️' : ''}${saved ? '★' : ''}${dotsHtml}`;

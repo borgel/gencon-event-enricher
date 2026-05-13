@@ -455,33 +455,35 @@ def test_type_clear_all_then_select_all(server):
 
 
 def test_schedule_export_downloads_csv(server):
-    """The Export schedule button triggers a CSV download with marked sessions."""
+    """Export modal lets user pick Mine + name, then downloads CSV with metadata."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")
-        # Save the BGM (Wingspan) session.
+        # Save the BGM session.
         page.click(".row")
         page.click("#detail-panel .save-toggle")
-        # Trigger export and capture the download.
+        # Open export modal.
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        # Mine is default; type a name.
+        page.fill("#export-name", "Bob")
         with page.expect_download() as info:
-            page.click("#f-export")
+            page.click("#export-confirm")
         dl = info.value
-        path = dl.path()
-        body = Path(path).read_text()
+        body = Path(dl.path()).read_text()
         lines = body.strip().split("\n")
-        # Header + 1 data row for the saved session.
-        assert lines[0] == "event_id,gencon_id,title,when,saved,purchased"
-        assert any("BGM26ND000001" in ln and "1,0" in ln for ln in lines[1:])
+        assert lines[0] == "# name=Bob"
+        assert lines[1] == "event_id,gencon_id,title,when,saved,purchased"
+        assert any("BGM26ND000001" in ln and "1,0" in ln for ln in lines[2:])
         ctx.close()
         browser.close()
 
 
 def test_schedule_import_replaces_state(tmp_path, server):
-    """Picking a CSV via the Import button replaces saved/purchased after confirm."""
-    # Build a CSV that marks the SEM session as purchased only.
+    """Action 'replace-mine' clears Mine and writes the imported saved/purchased."""
     csv_path = tmp_path / "schedule.csv"
     csv_path.write_text(
         "event_id,gencon_id,title,when,saved,purchased\n"
@@ -493,21 +495,146 @@ def test_schedule_import_replaces_state(tmp_path, server):
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector("#f-import", state="attached")
-        # Auto-accept the confirm dialog.
-        page.on("dialog", lambda d: d.accept())
-        # Upload the file via the hidden file input.
         page.set_input_files("#f-import", str(csv_path))
-        # After import: toolbar count = 0 saved, but ★ Saved button updates to 0.
-        page.wait_for_function(
-            "document.querySelector('#s-saved').textContent.includes('(0)')"
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # 'replace-mine' is default when CSV has no name.
+        assert page.query_selector("input[value=replace-mine]").is_checked()
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        purchased = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.purchased.v2') || '[]')"
         )
-        # The SEM row now has the 🎟 mark; the BGM row has none.
-        sem_row_marks = page.eval_on_selector_all(
-            ".row .marks", "els => els.map(e => e.textContent)"
+        assert "SEM26ND000005" in purchased
+        ctx.close()
+        browser.close()
+
+
+def test_import_add_to_mine_unions(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            "localStorage.setItem('gencon-enricher.saved.v2', JSON.stringify(['BGM26ND000001']))"
         )
-        joined = "|".join(sem_row_marks)
-        assert "🎟" in joined  # purchased SEM row shows the ticket glyph
-        assert "★" not in joined  # nothing saved
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        page.click("input[value=add-mine]")
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        saved = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.saved.v2') || '[]')"
+        )
+        assert "BGM26ND000001" in saved
+        assert "SEM26ND000005" in saved
+        ctx.close()
+        browser.close()
+
+
+def test_import_new_friend_list_creates_collection(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Smart default: name=Alice with no existing matching collection
+        # → 'new-list' pre-selected, name pre-filled.
+        assert page.query_selector("input[value=new-list]").is_checked()
+        assert page.query_selector("#new-list-name").input_value() == "Alice"
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert len(collections) == 1
+        assert collections[0]["name"] == "Alice"
+        assert "SEM26ND000005" in collections[0]["saved"]
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        ctx.close()
+        browser.close()
+
+
+def test_import_replace_existing_list_when_name_matches(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000001,BGM26ND000001,Wingspan,2026-07-30T09:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Smart default: name matches existing → 'replace-list' selected with Alice.
+        assert page.query_selector("input[value=replace-list]").is_checked()
+        assert page.query_selector("#replace-list-select").input_value() == "c-alice"
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert len(collections) == 1
+        assert collections[0]["id"] == "c-alice"
+        assert collections[0]["color"] == "#e76f51"
+        assert collections[0]["saved"] == ["BGM26ND000001"]
+        ctx.close()
+        browser.close()
+
+
+def test_import_into_mine_with_name_writes_my_name(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Bob\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000001,BGM26ND000001,Wingspan,2026-07-30T09:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Override smart default — pick replace-mine.
+        page.click("input[value=replace-mine]")
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        my_name = page.evaluate(
+            "localStorage.getItem('gencon-enricher.my-name.v1')"
+        )
+        assert my_name == "Bob"
         ctx.close()
         browser.close()
 
@@ -1232,5 +1359,348 @@ def test_phone_body_scroll_locked_when_detail_open(server):
         )
         restored = page.eval_on_selector("body", "e => getComputedStyle(e).overflow")
         assert restored != "hidden"
+        ctx.close()
+        browser.close()
+
+
+def test_friends_lists_section_appears_with_collections(server):
+    """Pre-populating localStorage.collections.v1 makes the rail section render."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Seed a collection that flags the SEM session.
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-test1111',
+                name: 'Alice',
+                color: '#e76f51',
+                saved: ['SEM26ND000005'],
+                purchased: [],
+                importedAt: '2026-05-13T00:00:00Z',
+                originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists")
+        # Section heading and the one collection row exist.
+        assert page.query_selector("#friends-lists h4") is not None
+        rows = page.query_selector_all("#friends-lists .friend-list-row")
+        assert len(rows) == 1
+        # Color swatch matches.
+        sw = page.query_selector("#friends-lists .friend-list-row .swatch")
+        assert sw.get_attribute("style") and "#e76f51" in sw.get_attribute("style")
+        # Name visible
+        name_el = page.query_selector("#friends-lists .friend-list-row .name")
+        assert name_el.inner_text() == "Alice"
+        # Clicking the checkbox toggles activeListIds in state.
+        cb = page.query_selector("#friends-lists .friend-list-row input[type=checkbox]")
+        cb.click()
+        # The list view should now show only events Alice flagged (the SEM row).
+        page.wait_for_function(
+            "document.querySelectorAll('#results-list .row').length === 1"
+        )
+        ctx.close()
+        browser.close()
+
+
+def test_friends_lists_section_hidden_when_no_collections(server):
+    """No section content when no collections; element exists but is hidden."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate("localStorage.removeItem('gencon-enricher.collections.v1')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        el = page.query_selector("#friends-lists")
+        assert el is not None
+        # Element is hidden (has 'hidden' class, no content).
+        klass = el.get_attribute("class") or ""
+        assert "hidden" in klass.split()
+        assert (el.inner_text() or "").strip() == ""
+        ctx.close()
+        browser.close()
+
+
+def test_row_badges_show_for_active_collection(server):
+    """When Alice's checkbox is on, the SEM row shows her colored dot."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row input[type=checkbox]")
+        # Check Alice's box.
+        page.click("#friends-lists .friend-list-row input[type=checkbox]")
+        # The SEM row's marks cell should now contain a dot with Alice's color.
+        page.wait_for_selector("#results-list .row .marks .friend-dot")
+        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
+        styles = [d.get_attribute("style") or "" for d in dots]
+        assert any("#e76f51" in s for s in styles)
+        titles = [d.get_attribute("title") or "" for d in dots]
+        assert "Alice" in titles
+        ctx.close()
+        browser.close()
+
+
+def test_row_badges_hidden_when_collection_unchecked_and_others_active(server):
+    """If Alice unchecked AND Mine active, Alice's dot does NOT show."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            localStorage.setItem('gencon-enricher.saved.v2', JSON.stringify(['SEM26ND000005']));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Mine is active (★ on), Alice unchecked.
+        page.click("#s-saved")
+        # Wait for filter to apply.
+        page.wait_for_function(
+            "document.querySelectorAll('#results-list .row').length === 1"
+        )
+        # No friend-dot for Alice (her checkbox is off).
+        dots = page.query_selector_all("#results-list .row .marks .friend-dot")
+        assert len(dots) == 0
+        ctx.close()
+        browser.close()
+
+
+def test_timeline_blocks_show_friend_dots(server):
+    """Alice's session appears on the timeline as a friend block with her dot."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Activate Alice's list, then switch to timeline.
+        page.click("#friends-lists .friend-list-row input[type=checkbox]")
+        page.evaluate("location.hash = 'view=timeline&lists=c-alice'")
+        page.wait_for_selector("#results-timeline .tl-event")
+        dots = page.query_selector_all("#results-timeline .tl-event .friend-dot")
+        assert len(dots) >= 1, "expected at least one friend-dot on a timeline block"
+        styles = [d.get_attribute("style") or "" for d in dots]
+        assert any("#e76f51" in s for s in styles), "expected Alice's color on a dot"
+        ctx.close()
+        browser.close()
+
+
+def test_detail_panel_lists_collections_that_have_event(server):
+    """Detail panel shows an 'Also saved by' chip per collection containing the event."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Click the SEM (Cosplay 101) row to open its detail panel.
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel .also-saved-by")
+        chips = page.query_selector_all("#detail-panel .also-saved-by .chip")
+        assert len(chips) == 1
+        sw = page.query_selector("#detail-panel .also-saved-by .chip .swatch")
+        assert sw.get_attribute("style") and "#e76f51" in sw.get_attribute("style")
+        name = page.query_selector("#detail-panel .also-saved-by .chip .name")
+        assert name.inner_text() == "Alice"
+        ctx.close()
+        browser.close()
+
+
+def test_detail_panel_no_also_saved_by_when_no_collection_has_event(server):
+    """No chip block when no collection contains any session of the event."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate("localStorage.removeItem('gencon-enricher.collections.v1')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("text=Cosplay 101")
+        page.wait_for_selector("#detail-panel:not(.hidden)")
+        assert page.query_selector("#detail-panel .also-saved-by") is None
+        ctx.close()
+        browser.close()
+
+
+def test_import_modal_opens_with_summary(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        summary = page.query_selector("#import-modal .summary").inner_text()
+        assert "1" in summary
+        actions = page.query_selector_all("#import-modal input[name='import-action']")
+        assert len(actions) == 4
+        # Cancel closes the modal without changing storage.
+        page.click("#import-modal .cancel-btn")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        ctx.close()
+        browser.close()
+
+
+def test_export_prefills_my_name(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate("localStorage.setItem('gencon-enricher.my-name.v1', 'Carol')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        assert page.query_selector("#export-name").input_value() == "Carol"
+        ctx.close()
+        browser.close()
+
+
+def test_export_friend_list_prefills_list_name(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        page.click("input[name=export-source][value=c-alice]")
+        assert page.query_selector("#export-name").input_value() == "Alice"
+        ctx.close()
+        browser.close()
+
+
+def test_manage_modal_rename(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        # Open manage modal.
+        page.click("#manage-collections-link")
+        page.wait_for_selector("#manage-modal:not(.hidden)")
+        # Accept the rename prompt with new value.
+        page.on("dialog", lambda d: d.accept("Alice K"))
+        page.click("#manage-modal .manage-row[data-id='c-alice'] .rename-btn")
+        page.wait_for_function(
+            "document.querySelector('#friends-lists .friend-list-row .name').textContent === 'Alice K'"
+        )
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert collections[0]["name"] == "Alice K"
+        assert collections[0]["originalExportName"] == "Alice"
+        ctx.close()
+        browser.close()
+
+
+def test_manage_modal_delete(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        page.click("#manage-collections-link")
+        page.wait_for_selector("#manage-modal:not(.hidden)")
+        page.on("dialog", lambda d: d.accept())
+        page.click("#manage-modal .manage-row[data-id='c-alice'] .delete-btn")
+        page.wait_for_function(
+            "document.querySelector('#friends-lists').classList.contains('hidden')"
+        )
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert collections == []
         ctx.close()
         browser.close()

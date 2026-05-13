@@ -18,9 +18,9 @@ export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClo
   const fireChange = () => { onChange && onChange(); };
 
   return {
-    show(group, overlapInfoMap) {
+    show(group, overlapInfoMap, opts) {
       currentOverlapInfo = overlapInfoMap || null;
-      panel.innerHTML = render(group, currentOverlapInfo);
+      panel.innerHTML = render(group, currentOverlapInfo, opts?.allCollections);
       panel.querySelector('.close').addEventListener('click', close);
       // Wire per-session toggles. Each .session-card carries its session id
       // in data-session-id; saved/purchased state is keyed on that.
@@ -47,11 +47,12 @@ export function createDetailView({ panel, onCloseToggle, onChange, onShow, onClo
   };
 }
 
-function render(g, perSessionOverlap) {
+function render(g, perSessionOverlap, allCollections) {
   return `
     <span class="close" title="Close detail">✕</span>
     <h2>${escape(g.title)}</h2>
     <div class="meta">${escape(g.event_type_label)} · ${formatPlayers(g)} · ${formatCost(g)} · ${escape(g.age_required)} · ${escape(g.experience_required)}</div>
+    ${alsoSavedByHtml(g, allCollections)}
     ${signupRow(g)}
     ${g.bgg ? bggCard(g.bgg) : '<div class="meta" style="font-style:italic">No BGG match.</div>'}
     <h3 style="margin-top:14px;font-size:14px">Description</h3>
@@ -165,4 +166,22 @@ function escape(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function alsoSavedByHtml(g, allCollections) {
+  const matches = (allCollections || []).filter(c =>
+    g.sessions?.some(s => (c.saved || []).includes(s.gencon_id) || (c.purchased || []).includes(s.gencon_id))
+  );
+  if (matches.length === 0) return '';
+  const chips = matches.map(c => `
+    <span class="chip" data-id="${escapeAttr(c.id)}">
+      <span class="swatch" style="background:${escapeAttr(c.color)}"></span>
+      <span class="name">${escape(c.name)}</span>
+    </span>
+  `).join('');
+  return `<div class="also-saved-by"><span class="label">Also saved by:</span>${chips}</div>`;
 }

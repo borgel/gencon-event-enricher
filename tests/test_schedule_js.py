@@ -179,3 +179,128 @@ def test_import_truthy_variations(page):
     obj = json.loads(_eval(page, js))
     assert obj["saved"] == ["BGM26ND313243", "RPG26ND400500"]
     assert obj["purchased"] == ["RPG26ND400500"]
+
+
+def test_export_includes_name_metadata_when_provided(page):
+    """exportSchedule({name:'Alice', ...}) puts '# name=Alice' as line 1."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const saved = new Set(['BGM26ND313243']);
+    const purchased = new Set();
+    return S.exportSchedule(groups, saved, purchased, {{name: 'Alice'}});
+    """
+    csv = _eval(page, js)
+    lines = csv.strip().split("\n")
+    assert lines[0] == "# name=Alice"
+    assert lines[1] == "event_id,gencon_id,title,when,saved,purchased"
+
+
+def test_export_omits_metadata_when_name_empty(page):
+    """No metadata row when name is empty / not provided."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const saved = new Set(['BGM26ND313243']);
+    return S.exportSchedule(groups, saved, new Set(), {{name: ''}});
+    """
+    csv = _eval(page, js)
+    lines = csv.strip().split("\n")
+    assert lines[0] == "event_id,gencon_id,title,when,saved,purchased"
+
+
+def test_import_parses_name_metadata(page):
+    """parseScheduleCSV returns the imported name from a '# name=' row."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv =
+      '# name=Bob\\n' +
+      'event_id,gencon_id,title,when,saved,purchased\\n' +
+      '313243,BGM26ND313243,Foo,2026-07-31T19:00,1,0\\n';
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{
+      name: result.name, saved: [...result.saved], matched: result.matched,
+    }});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == "Bob"
+    assert obj["saved"] == ["BGM26ND313243"]
+    assert obj["matched"] == 1
+
+
+def test_import_without_metadata_still_works(page):
+    """Backwards-compat: name is empty string when no metadata row exists."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv =
+      'event_id,gencon_id,title,when,saved,purchased\\n' +
+      '313243,BGM26ND313243,Foo,2026-07-31T19:00,1,0\\n';
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{name: result.name, matched: result.matched}});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == ""
+    assert obj["matched"] == 1
+
+
+def test_import_ignores_unknown_metadata(page):
+    """Future-proofing: extra metadata keys are ignored, not errors."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv =
+      '# exporter_version=2\\n' +
+      '# name=Carol\\n' +
+      '# unknown_key=nonsense\\n' +
+      'event_id,gencon_id,title,when,saved,purchased\\n' +
+      '313243,BGM26ND313243,Foo,2026-07-31T19:00,1,0\\n';
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{name: result.name, matched: result.matched}});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == "Carol"
+    assert obj["matched"] == 1
+
+
+def test_roundtrip_preserves_name(page):
+    """Export with name=Dave, import it back → result.name === 'Dave'."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set(), {{name: 'Dave'}});
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{name: result.name}});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == "Dave"
+
+
+def test_roundtrip_name_with_comma_survives(page):
+    """A collection name containing a comma must round-trip cleanly."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set(), {{name: 'Smith, Alice'}});
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{name: result.name, matched: result.matched}});
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["name"] == "Smith, Alice"
+    assert obj["matched"] == 1
+
+
+def test_export_strips_newlines_from_name(page):
+    """An accidental newline in a name must not corrupt the file."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(
+      groups, new Set(['BGM26ND313243']), new Set(),
+      {{name: 'Alice\\nBob'}}
+    );
+    const result = S.parseScheduleCSV(csv, groups);
+    return JSON.stringify({{
+      firstLine: csv.split('\\n')[0],
+      name: result.name,
+      matched: result.matched,
+    }});
+    """
+    obj = json.loads(_eval(page, js))
+    # Newline must be collapsed; metadata stays on one line.
+    assert obj["firstLine"] == "# name=Alice Bob"
+    assert obj["name"] == "Alice Bob"
+    assert obj["matched"] == 1

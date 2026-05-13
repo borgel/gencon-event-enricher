@@ -8,6 +8,11 @@ import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
+import {
+  listCollections, createCollection, replaceCollection, findByName,
+  getMyName, setMyName, getCollection,
+  renameCollection, deleteCollection,
+} from './collections.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -93,6 +98,7 @@ function renderFilterRail(state, onChange) {
       <label><input type="checkbox" id="f-tix" ${state.ticketsOnly?'checked':''}> Tickets available</label><br>
       <label><input type="checkbox" id="f-tournament" ${state.tournament==='yes'?'checked':''}> Tournament only</label>
     </div>
+    <section id="friends-lists" class="rail-section hidden"></section>
     <div class="group">
       <button id="f-clear" type="button">Clear filters</button>
     </div>
@@ -152,7 +158,7 @@ function renderResultsToolbar(state, onChange) {
     </div>
     <div class="toolbar-right">
       <button id="s-timeline" type="button" class="${state.viewMode === 'timeline' ? 'active' : ''}">🗓️ Timeline</button>
-      <button id="s-saved" type="button" class="${state.savedOnly ? 'active' : ''}">★ Saved (0)</button>
+      <button id="s-saved" type="button" class="${state.mineActive ? 'active' : ''}">★ Saved (0)</button>
       <button id="s-lucky" type="button" disabled>🎲 I'm Feeling Lucky</button>
     </div>
   `;
@@ -171,7 +177,7 @@ function renderResultsToolbar(state, onChange) {
     onChange();
   });
   document.querySelector('#s-saved').addEventListener('click', () => {
-    state.savedOnly = !state.savedOnly;
+    state.mineActive = !state.mineActive;
     onChange();
   });
   document.querySelector('#s-timeline').addEventListener('click', () => {
@@ -239,7 +245,7 @@ async function main() {
     container: $('#results-list'),
     onRowClick: (key) => {
       const g = groupsByKey.get(key);
-      detailView.show(g, latestOverlap.perSession);
+      detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() });
     },
   });
   const detailView = createDetailView({
@@ -250,41 +256,73 @@ async function main() {
   });
   const timelineView = createTimelineView({
     container: $('#results-timeline'),
-    onEventClick: (g) => detailView.show(g, latestOverlap.perSession),
+    onEventClick: (g) => detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() }),
   });
 
   function attachLuckyHandler() {
     document.querySelector('#s-lucky').addEventListener('click', () => {
       if (!lastVisibleGroups.length) return;
       const g = lastVisibleGroups[Math.floor(Math.random() * lastVisibleGroups.length)];
-      detailView.show(g, latestOverlap.perSession);
+      detailView.show(g, latestOverlap.perSession, { allCollections: listCollections() });
       tableView.scrollToKey(g.key);
       tableView.setSelectedKey(g.key);
     });
   }
 
+  function renderFriendsLists() {
+    const container = document.querySelector('#friends-lists');
+    if (!container) return;
+    const collections = listCollections();
+    if (collections.length === 0) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+    container.classList.remove('hidden');
+    const rowsHtml = collections.map(c => {
+      const checked = state.activeListIds.has(c.id) ? 'checked' : '';
+      const total = c.saved.length + c.purchased.length;
+      return `
+        <label class="friend-list-row" data-id="${c.id}">
+          <input type="checkbox" ${checked} data-id="${c.id}">
+          <span class="swatch" style="background:${c.color}"></span>
+          <span class="name">${escapeHtml(c.name)}</span>
+          <span class="count">${total}</span>
+        </label>
+      `;
+    }).join('');
+    container.innerHTML = `
+      <h4>Friend's Lists</h4>
+      ${rowsHtml}
+      <a class="manage-link" href="#" id="manage-collections-link">Manage…</a>
+    `;
+    container.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+      cb.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        if (e.target.checked) state.activeListIds.add(id);
+        else state.activeListIds.delete(id);
+        applyFilters();
+      });
+    });
+    const manageLink = container.querySelector('#manage-collections-link');
+    if (manageLink) {
+      manageLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        openManageModal();
+      });
+    }
+  }
+
   function attachScheduleHandlers() {
     document.querySelector('#f-export').addEventListener('click', () => {
-      const csv = exportSchedule(blob.groups, getSaved(), getPurchased());
-      const today = new Date().toISOString().slice(0, 10);
-      triggerDownload(`gencon-schedule-${today}.csv`, csv);
+      openExportModal();
     });
     document.querySelector('#f-import').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const text = await file.text();
       const result = parseScheduleCSV(text, blob.groups);
-      const summary = `${result.matched} sessions matched` +
-        (result.missed ? `, ${result.missed} not found in current data` : '');
-      const ok = window.confirm(
-        `Import schedule?\n\n${summary}.\n\n` +
-        `This will replace your current Saved and Purchased state.`,
-      );
-      if (ok) {
-        replaceSaved(result.saved);
-        replacePurchased(result.purchased);
-        applyFilters();
-      }
+      openImportModal(result, text);
       // Reset so the same file can be re-selected later.
       e.target.value = '';
     });
@@ -313,6 +351,7 @@ async function main() {
   // back/forward navigation).
   function renderAllFilterUI() {
     renderFilterRail(state, applyFilters);
+    renderFriendsLists();
     populateMultiselect('f-types', uniqueTypes, state.types, applyFilters, typeLabels);
     populateMultiselect('f-locations', uniqueLocations, state.locations, applyFilters);
     renderResultsToolbar(state, applyFilters);
@@ -354,9 +393,17 @@ async function main() {
     const overlapInfo = groupOverlapMap(blob.groups, saved, purchased);
     latestOverlap = overlapInfo;
     if (openGroup) {
-      detailView.show(openGroup, overlapInfo.perSession);
+      detailView.show(openGroup, overlapInfo.perSession, { allCollections: listCollections() });
     }
-    const pred = buildPredicate(state, saved);
+    const mineSaved = new Set([...saved, ...purchased]);
+    const collections = listCollections();
+    // Drop stale collection IDs (e.g., from a shared URL referencing a since-
+    // deleted list) so they don't haunt the hash forever.
+    const validIds = new Set(collections.map(c => c.id));
+    for (const id of [...state.activeListIds]) {
+      if (!validIds.has(id)) state.activeListIds.delete(id);
+    }
+    const pred = buildPredicate(state, mineSaved, collections);
     let visible = blob.groups.filter(pred);
     const hits = searchKeys(index, state.search);
     if (hits) visible = visible.filter(g => hits.has(g.key));
@@ -367,16 +414,21 @@ async function main() {
     const savedBtn = document.querySelector('#s-saved');
     if (savedBtn) {
       savedBtn.textContent = `★ Saved (${saved.size})`;
-      savedBtn.classList.toggle('active', state.savedOnly);
+      savedBtn.classList.toggle('active', state.mineActive);
     }
     const tlBtn = document.querySelector('#s-timeline');
     if (tlBtn) tlBtn.classList.toggle('active', state.viewMode === 'timeline');
     document.body.classList.toggle('timeline-on', state.viewMode === 'timeline');
     // List is always visible and always in sync with the predicate.
+    const anySourceActive = state.mineActive || state.activeListIds.size > 0;
+    const visibleCollections = anySourceActive
+      ? collections.filter(c => state.activeListIds.has(c.id))
+      : collections;
     tableView.setRows(visible, {
       saved,
       purchased,
       conflicts: latestOverlap.conflictedGroups,
+      visibleCollections,
     });
     // Timeline is an additional side-by-side panel, toggled by viewMode.
     if (state.viewMode === 'timeline') {
@@ -392,6 +444,7 @@ async function main() {
         purchased,
         conflictedSessionIds,
         openGroup,
+        visibleCollections,
       );
     } else {
       $('#results-timeline').classList.add('hidden');
@@ -402,6 +455,7 @@ async function main() {
       `${blob.meta.stats.unmatched.toLocaleString()} unmatched in dataset`;
     const hash = stateToHash(state, { allTypes: uniqueTypes });
     history.replaceState(null, '', hash ? `#${hash}` : '#');
+    renderFriendsLists();
   }
 
   window.addEventListener('popstate', () => {
@@ -411,6 +465,254 @@ async function main() {
     applyFilters();
   });
 
+  // ── Import modal ──────────────────────────────────────────────────────────
+
+  let pendingImportResult = null;
+
+  function openImportModal(result, /* rawText */ _rawText) {
+    const modal = document.querySelector('#import-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    modal.querySelector('.summary').textContent =
+      `${result.matched} sessions matched` +
+      (result.missed ? `, ${result.missed} not found in current data` : '');
+    pendingImportResult = result;
+
+    // Populate the replace-list <select> with current collections.
+    const select = modal.querySelector('#replace-list-select');
+    select.innerHTML = '';
+    for (const c of listCollections()) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    }
+
+    // Pre-fill the new-list-name input with the imported CSV's `name`.
+    modal.querySelector('#new-list-name').value = result.name || '';
+
+    // Smart default: pick the most appropriate action based on imported name and existing state.
+    const radios = modal.querySelectorAll('input[name=import-action]');
+    radios.forEach(r => r.checked = false);
+    let defaultAction = 'replace-mine';
+    if (result.name) {
+      const existing = findByName(result.name);
+      if (existing) {
+        defaultAction = 'replace-list';
+        select.value = existing.id;
+      } else {
+        defaultAction = 'new-list';
+      }
+    }
+    modal.querySelector(`input[value=${defaultAction}]`).checked = true;
+
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeImportModal() {
+    document.querySelector('#import-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+    pendingImportResult = null;
+  }
+
+  document.querySelector('#import-modal .cancel-btn').addEventListener('click', closeImportModal);
+  document.querySelector('#modal-backdrop').addEventListener('click', () => {
+    closeImportModal();
+    closeExportModal();
+    closeManageModal();
+  });
+
+  document.querySelector('#import-confirm').addEventListener('click', () => {
+    if (!pendingImportResult) { closeImportModal(); return; }
+    const action = document.querySelector('input[name=import-action]:checked')?.value;
+    const r = pendingImportResult;
+    const importedName = r.name || '';
+    if (action === 'replace-mine') {
+      replaceSaved(r.saved);
+      replacePurchased(r.purchased);
+      if (importedName) setMyName(importedName);
+    } else if (action === 'add-mine') {
+      const cur = getSaved();
+      for (const id of r.saved) cur.add(id);
+      replaceSaved(cur);
+      const curP = getPurchased();
+      for (const id of r.purchased) curP.add(id);
+      replacePurchased(curP);
+      if (importedName) setMyName(importedName);
+    } else if (action === 'replace-list') {
+      const id = document.querySelector('#replace-list-select').value;
+      if (!id) { alert('No friend\'s list selected.'); return; }
+      replaceCollection(id, {
+        saved: [...r.saved],
+        purchased: [...r.purchased],
+        originalExportName: importedName,
+      });
+    } else if (action === 'new-list') {
+      const name = document.querySelector('#new-list-name').value.trim();
+      if (!name) { alert('Please enter a name for the new friend\'s list.'); return; }
+      createCollection({
+        name,
+        saved: [...r.saved],
+        purchased: [...r.purchased],
+        originalExportName: importedName,
+      });
+    }
+    closeImportModal();
+    applyFilters();
+  });
+
+  // ── Export modal ──────────────────────────────────────────────────────────
+
+  function openExportModal() {
+    const modal = document.querySelector('#export-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    const sources = modal.querySelector('#export-sources');
+    const collections = listCollections();
+    let html = `
+      <label class="action-row">
+        <input type="radio" name="export-source" value="mine" checked>
+        <span>My events (saved: ${getSaved().size}, purchased: ${getPurchased().size})</span>
+      </label>
+    `;
+    for (const c of collections) {
+      html += `
+        <label class="action-row">
+          <input type="radio" name="export-source" value="${escapeAttr(c.id)}">
+          <span><span class="swatch" style="background:${escapeAttr(c.color)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${escapeHtml(c.name)} (saved: ${c.saved.length}, purchased: ${c.purchased.length})</span>
+        </label>
+      `;
+    }
+    sources.innerHTML = html;
+    const nameInput = modal.querySelector('#export-name');
+    nameInput.value = getMyName();
+    sources.querySelectorAll('input[name=export-source]').forEach(r => {
+      r.addEventListener('change', () => {
+        if (r.value === 'mine') nameInput.value = getMyName();
+        else {
+          const c = getCollection(r.value);
+          nameInput.value = c ? c.name : '';
+        }
+      });
+    });
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeExportModal() {
+    document.querySelector('#export-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+  }
+
+  document.querySelector('#export-modal .cancel-btn').addEventListener('click', closeExportModal);
+
+  // ── Manage modal ──────────────────────────────────────────────────────────
+
+  function openManageModal() {
+    const modal = document.querySelector('#manage-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    renderManageRows();
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeManageModal() {
+    document.querySelector('#manage-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+  }
+
+  function renderManageRows() {
+    const container = document.querySelector('#manage-rows');
+    const collections = listCollections();
+    if (collections.length === 0) {
+      container.innerHTML = '<p class="muted">No friend\'s lists yet.</p>';
+      return;
+    }
+    container.innerHTML = collections.map(c => {
+      const imported = (c.importedAt || '').slice(0, 10);
+      return `
+        <div class="manage-row" data-id="${escapeAttr(c.id)}">
+          <div class="manage-row-head">
+            <span class="swatch" style="background:${escapeAttr(c.color)}"></span>
+            <span class="name">${escapeHtml(c.name)}</span>
+          </div>
+          <div class="manage-row-meta">
+            ${c.saved.length} saved, ${c.purchased.length} purchased · imported ${imported}
+          </div>
+          <div class="manage-row-actions">
+            <button type="button" class="rename-btn">Rename</button>
+            <button type="button" class="export-btn">Export</button>
+            <button type="button" class="delete-btn">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    container.querySelectorAll('.rename-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        const cur = getCollection(id);
+        const next = window.prompt('New name:', cur?.name || '');
+        if (next == null) return;
+        const trimmed = next.trim();
+        if (!trimmed) return;
+        renameCollection(id, trimmed);
+        renderManageRows();
+        renderFriendsLists();
+        applyFilters();
+      });
+    });
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        const cur = getCollection(id);
+        if (!window.confirm(`Delete "${cur?.name ?? id}"?`)) return;
+        deleteCollection(id);
+        state.activeListIds.delete(id);
+        renderManageRows();
+        renderFriendsLists();
+        applyFilters();
+      });
+    });
+    container.querySelectorAll('.export-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        closeManageModal();
+        openExportModal();
+        const radio = document.querySelector(`input[name=export-source][value="${id}"]`);
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  }
+
+  document.querySelector('#manage-modal .cancel-btn').addEventListener('click', closeManageModal);
+
+  document.querySelector('#export-confirm').addEventListener('click', () => {
+    const sel = document.querySelector('input[name=export-source]:checked')?.value;
+    const name = document.querySelector('#export-name').value.trim();
+    let saved, purchased;
+    if (sel === 'mine') {
+      saved = getSaved();
+      purchased = getPurchased();
+    } else {
+      const c = getCollection(sel);
+      if (!c) return;
+      saved = new Set(c.saved);
+      purchased = new Set(c.purchased);
+    }
+    const csv = exportSchedule(blob.groups, saved, purchased, { name });
+    const today = new Date().toISOString().slice(0, 10);
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const fname = slug
+      ? `gencon-schedule-${slug}-${today}.csv`
+      : `gencon-schedule-${today}.csv`;
+    triggerDownload(fname, csv);
+    closeExportModal();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   ensureDefaultTypes();
   renderAllFilterUI();
   applyFilters();
@@ -418,6 +720,12 @@ async function main() {
 
 function escapeAttr(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }

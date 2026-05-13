@@ -2,7 +2,7 @@
 //   { search, days: Set<'thu'|'fri'|'sat'|'sun'>, hourMin, hourMax,
 //     types: Set<string>, durMinH, durMaxH,
 //     party, costBand, age, experience, ticketsOnly, tournament,
-//     locations: Set<string>, bggMin, bggMatch, savedOnly }
+//     locations: Set<string>, bggMin, bggMatch, mineActive, activeListIds: Set<string> }
 
 import { applyHashPair as applySortHashPair, sortStateToHash } from './sort.js';
 
@@ -22,7 +22,8 @@ export function defaultState() {
     locations: new Set(),
     bggMin: 0,
     bggMatch: 'either',  // 'either'|'yes'|'no'
-    savedOnly: false,
+    mineActive: false,
+    activeListIds: new Set(),
     sortKey: 'start',
     sortDir: 'asc',
     viewMode: 'list',
@@ -49,9 +50,27 @@ function costBandOf(cost) {
   return '10+';
 }
 
-export function buildPredicate(state, savedKeys) {
+// state.mineActive + state.activeListIds drive the union saved-filter.
+// mineSaved is Mine's union of saved + purchased session IDs.
+// collections is the array from listCollections().
+export function buildPredicate(state, mineSaved, collections) {
+  const activeListIds = state.activeListIds;
+  const activeLists = (collections || []).filter(c => activeListIds.has(c.id));
+  const anySourceActive = state.mineActive || activeLists.length > 0;
+
   return (g) => {
-    if (state.savedOnly && !g.sessions.some(s => savedKeys.has(s.gencon_id))) return false;
+    if (anySourceActive) {
+      const matches = g.sessions.some((s) => {
+        if (state.mineActive && mineSaved.has(s.gencon_id)) return true;
+        for (const c of activeLists) {
+          if (c.saved.includes(s.gencon_id)) return true;
+          if (c.purchased.includes(s.gencon_id)) return true;
+        }
+        return false;
+      });
+      if (!matches) return false;
+    }
+
     if (state.bggMatch === 'yes' && !g.bgg) return false;
     if (state.bggMatch === 'no'  && g.bgg)  return false;
     if (state.bggMin > 0) {
@@ -80,7 +99,6 @@ export function buildPredicate(state, savedKeys) {
       if (state.durMaxH < 12 && h > state.durMaxH) return false;
     }
 
-    // Sessions-aware filters: if any session passes, the group passes.
     const dayCheck = state.days.size > 0;
     const hourCheck = state.hourMin > 0 || state.hourMax < 24;
     const ticketsCheck = state.ticketsOnly;
@@ -98,7 +116,7 @@ export function buildPredicate(state, savedKeys) {
     }
 
     if (state.search) {
-      // Search is layered later via MiniSearch; here we just respect it as a no-op.
+      // Search is layered later via MiniSearch.
     }
     return true;
   };
@@ -141,7 +159,8 @@ export function stateToHash(state, options = {}) {
   if (state.tournament !== 'either') parts.push(`tourn=${state.tournament}`);
   if (state.bggMin > 0)   parts.push(`bgg=${state.bggMin}`);
   if (state.bggMatch !== 'either') parts.push(`bggMatch=${state.bggMatch}`);
-  if (state.savedOnly)    parts.push(`saved=1`);
+  if (state.mineActive)   parts.push(`saved=1`);
+  if (state.activeListIds.size) parts.push(`lists=${[...state.activeListIds].join(',')}`);
   const sortFrag = sortStateToHash({ key: state.sortKey, dir: state.sortDir });
   if (sortFrag) parts.push(sortFrag);
   if (state.viewMode === 'timeline') parts.push('view=timeline');
@@ -173,7 +192,8 @@ export function hashToState(hash) {
       case 'bggMatch':
         if (dv === 'yes' || dv === 'no' || dv === 'either') s.bggMatch = dv;
         break;
-      case 'saved': s.savedOnly = dv === '1'; break;
+      case 'saved': s.mineActive = dv === '1'; break;
+      case 'lists': s.activeListIds = new Set(dv.split(',').filter(Boolean)); break;
       case 'view':
         if (dv === 'timeline' || dv === 'list') s.viewMode = dv;
         break;

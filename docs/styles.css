@@ -445,7 +445,7 @@ body.drawer-open #drawer-backdrop {
    timeline view, so the timeline + detail can use the whole width. The
    list becomes redundant in this configuration anyway — you're navigating
    the schedule, not the search results. ----- */
-@media (max-width: 1100px) {
+@media (max-width: 1500px) {
   body.timeline-on.detail-open #results-list-wrap { display: none; }
 }
 

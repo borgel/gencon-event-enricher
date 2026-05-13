@@ -1736,7 +1736,7 @@ def test_wide_window_keeps_list_visible_with_timeline_and_detail(server):
     visible — the auto-hide only kicks in at narrow viewports."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        ctx = browser.new_context(viewport={"width": 1400, "height": 800})
+        ctx = browser.new_context(viewport={"width": 1700, "height": 800})
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")

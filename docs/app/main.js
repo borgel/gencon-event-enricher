@@ -320,17 +320,7 @@ async function main() {
       if (!file) return;
       const text = await file.text();
       const result = parseScheduleCSV(text, blob.groups);
-      const summary = `${result.matched} sessions matched` +
-        (result.missed ? `, ${result.missed} not found in current data` : '');
-      const ok = window.confirm(
-        `Import schedule?\n\n${summary}.\n\n` +
-        `This will replace your current Saved and Purchased state.`,
-      );
-      if (ok) {
-        replaceSaved(result.saved);
-        replacePurchased(result.purchased);
-        applyFilters();
-      }
+      openImportModal(result, text);
       // Reset so the same file can be re-selected later.
       e.target.value = '';
     });
@@ -466,6 +456,51 @@ async function main() {
     renderAllFilterUI();
     applyFilters();
   });
+
+  // ── Import modal ──────────────────────────────────────────────────────────
+
+  let pendingImportResult = null;
+
+  function openImportModal(result, /* rawText */ _rawText) {
+    const modal = document.querySelector('#import-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    modal.querySelector('.summary').textContent =
+      `${result.matched} sessions matched` +
+      (result.missed ? `, ${result.missed} not found in current data` : '');
+    pendingImportResult = result;
+
+    // Populate the replace-list <select> with current collections.
+    const select = modal.querySelector('#replace-list-select');
+    select.innerHTML = '';
+    for (const c of listCollections()) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      select.appendChild(opt);
+    }
+
+    // Pre-fill the new-list-name input with the imported CSV's `name`.
+    modal.querySelector('#new-list-name').value = result.name || '';
+
+    // Default action: replace-mine. Task 10 refines this with smart-default logic.
+    const radios = modal.querySelectorAll('input[name=import-action]');
+    radios.forEach(r => r.checked = false);
+    modal.querySelector('input[value=replace-mine]').checked = true;
+
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeImportModal() {
+    document.querySelector('#import-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+    pendingImportResult = null;
+  }
+
+  document.querySelector('#import-modal .cancel-btn').addEventListener('click', closeImportModal);
+  document.querySelector('#modal-backdrop').addEventListener('click', closeImportModal);
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   ensureDefaultTypes();
   renderAllFilterUI();

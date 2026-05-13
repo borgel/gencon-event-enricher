@@ -36,6 +36,39 @@
     </div>
   </main>
 </div>
+<div id="modal-backdrop" class="hidden"></div>
+
+<div id="import-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <h3>Import schedule</h3>
+    <p class="summary"></p>
+    <form id="import-form">
+      <label class="action-row">
+        <input type="radio" name="import-action" value="replace-mine">
+        <span>Replace my events</span>
+      </label>
+      <label class="action-row">
+        <input type="radio" name="import-action" value="add-mine">
+        <span>Add to my events</span>
+      </label>
+      <label class="action-row">
+        <input type="radio" name="import-action" value="replace-list">
+        <span>Replace an existing friend's list:</span>
+        <select id="replace-list-select"></select>
+      </label>
+      <label class="action-row">
+        <input type="radio" name="import-action" value="new-list">
+        <span>Import as a new friend's list:</span>
+        <input type="text" id="new-list-name" placeholder="Name">
+      </label>
+    </form>
+    <div class="modal-actions">
+      <button type="button" class="cancel-btn">Cancel</button>
+      <button type="button" class="confirm-btn" id="import-confirm">Import</button>
+    </div>
+  </div>
+</div>
+
 <script type="module" src="app/main.js"></script>
 </body>
 </html>

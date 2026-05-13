@@ -479,6 +479,7 @@ def test_schedule_export_downloads_csv(server):
         browser.close()
 
 
+@pytest.mark.xfail(reason="superseded by import-modal flow, rewritten in Task 10")
 def test_schedule_import_replaces_state(tmp_path, server):
     """Picking a CSV via the Import button replaces saved/purchased after confirm."""
     # Build a CSV that marks the SEM session as purchased only.
@@ -1441,5 +1442,31 @@ def test_detail_panel_no_also_saved_by_when_no_collection_has_event(server):
         page.click("text=Cosplay 101")
         page.wait_for_selector("#detail-panel:not(.hidden)")
         assert page.query_selector("#detail-panel .also-saved-by") is None
+        ctx.close()
+        browser.close()
+
+
+def test_import_modal_opens_with_summary(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        summary = page.query_selector("#import-modal .summary").inner_text()
+        assert "1" in summary
+        actions = page.query_selector_all("#import-modal input[name='import-action']")
+        assert len(actions) == 4
+        # Cancel closes the modal without changing storage.
+        page.click("#import-modal .cancel-btn")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
         ctx.close()
         browser.close()

@@ -176,3 +176,41 @@ def test_palette_cycles_when_exhausted(page):
     palette = {"#e76f51", "#2a9d8f", "#f4a261", "#9b5de5", "#00bbf9", "#f15bb5"}
     assert colors[6] in palette
     assert colors[7] in palette
+
+
+def test_invalid_stored_color_is_sanitized_on_read(page):
+    """A hand-edited localStorage entry with a non-hex color gets repaired."""
+    js = """
+    // Seed a collection with a malicious / malformed color directly.
+    localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+      id: 'c-bad1', name: 'Tampered', color: 'red; background-image:url(x)',
+      saved: [], purchased: [], importedAt: '2026-05-13T00:00:00Z',
+      originalExportName: 'Tampered'
+    }]));
+    // First read sanitizes and rewrites storage.
+    const after = C.listCollections();
+    const stored = JSON.parse(localStorage.getItem('gencon-enricher.collections.v1'));
+    return JSON.stringify({
+      readColor: after[0].color,
+      storedColor: stored[0].color,
+      valid: C.isValidColor(after[0].color),
+    });
+    """
+    obj = json.loads(_eval(page, js))
+    assert obj["valid"] is True
+    assert obj["readColor"].startswith("#")
+    # Sanitization is persisted so subsequent reads are stable.
+    assert obj["readColor"] == obj["storedColor"]
+
+
+def test_valid_color_is_preserved_on_read(page):
+    """A correctly-formatted hex color is not mutated."""
+    js = """
+    localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+      id: 'c-ok', name: 'Fine', color: '#abcdef',
+      saved: [], purchased: [], importedAt: '2026-05-13T00:00:00Z',
+      originalExportName: 'Fine'
+    }]));
+    return C.listCollections()[0].color;
+    """
+    assert _eval(page, js) == "#abcdef"

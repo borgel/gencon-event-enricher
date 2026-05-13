@@ -15,13 +15,34 @@ export const FRIEND_PALETTE = [
 export const COLLECTIONS_KEY = 'gencon-enricher.collections.v1';
 export const MY_NAME_KEY = 'gencon-enricher.my-name.v1';
 
+// Accept either #abc or #aabbcc forms; case-insensitive.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export function isValidColor(s) {
+  return typeof s === 'string' && HEX_COLOR_RE.test(s);
+}
+
 function readAll() {
+  let arr;
   try {
-    const arr = JSON.parse(localStorage.getItem(COLLECTIONS_KEY) ?? '[]');
-    return Array.isArray(arr) ? arr : [];
+    arr = JSON.parse(localStorage.getItem(COLLECTIONS_KEY) ?? '[]');
   } catch {
     return [];
   }
+  if (!Array.isArray(arr)) return [];
+  // Sanitize any collection whose stored color is missing or invalid (e.g.,
+  // hand-edited localStorage). Reassign deterministically from the palette so
+  // downstream render sites can trust c.color without escaping.
+  const usedValid = arr.filter(c => isValidColor(c?.color)).map(c => c.color);
+  let mutated = false;
+  for (const c of arr) {
+    if (!c || isValidColor(c.color)) continue;
+    c.color = assignNextColor(usedValid);
+    usedValid.push(c.color);
+    mutated = true;
+  }
+  if (mutated) writeAll(arr);
+  return arr;
 }
 
 function writeAll(arr) {

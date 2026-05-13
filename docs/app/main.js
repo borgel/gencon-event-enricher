@@ -8,7 +8,7 @@ import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
-import { listCollections } from './collections.js';
+import { listCollections, createCollection, replaceCollection, findByName, getMyName, setMyName } from './collections.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -482,10 +482,20 @@ async function main() {
     // Pre-fill the new-list-name input with the imported CSV's `name`.
     modal.querySelector('#new-list-name').value = result.name || '';
 
-    // Default action: replace-mine. Task 10 refines this with smart-default logic.
+    // Smart default: pick the most appropriate action based on imported name and existing state.
     const radios = modal.querySelectorAll('input[name=import-action]');
     radios.forEach(r => r.checked = false);
-    modal.querySelector('input[value=replace-mine]').checked = true;
+    let defaultAction = 'replace-mine';
+    if (result.name) {
+      const existing = findByName(result.name);
+      if (existing) {
+        defaultAction = 'replace-list';
+        select.value = existing.id;
+      } else {
+        defaultAction = 'new-list';
+      }
+    }
+    modal.querySelector(`input[value=${defaultAction}]`).checked = true;
 
     modal.classList.remove('hidden');
     backdrop.classList.remove('hidden');
@@ -499,6 +509,45 @@ async function main() {
 
   document.querySelector('#import-modal .cancel-btn').addEventListener('click', closeImportModal);
   document.querySelector('#modal-backdrop').addEventListener('click', closeImportModal);
+
+  document.querySelector('#import-confirm').addEventListener('click', () => {
+    if (!pendingImportResult) { closeImportModal(); return; }
+    const action = document.querySelector('input[name=import-action]:checked')?.value;
+    const r = pendingImportResult;
+    const importedName = r.name || '';
+    if (action === 'replace-mine') {
+      replaceSaved(r.saved);
+      replacePurchased(r.purchased);
+      if (importedName) setMyName(importedName);
+    } else if (action === 'add-mine') {
+      const cur = getSaved();
+      for (const id of r.saved) cur.add(id);
+      replaceSaved(cur);
+      const curP = getPurchased();
+      for (const id of r.purchased) curP.add(id);
+      replacePurchased(curP);
+      if (importedName) setMyName(importedName);
+    } else if (action === 'replace-list') {
+      const id = document.querySelector('#replace-list-select').value;
+      if (!id) { alert('No friend\'s list selected.'); return; }
+      replaceCollection(id, {
+        saved: [...r.saved],
+        purchased: [...r.purchased],
+        originalExportName: importedName,
+      });
+    } else if (action === 'new-list') {
+      const name = document.querySelector('#new-list-name').value.trim();
+      if (!name) { alert('Please enter a name for the new friend\'s list.'); return; }
+      createCollection({
+        name,
+        saved: [...r.saved],
+        purchased: [...r.purchased],
+        originalExportName: importedName,
+      });
+    }
+    closeImportModal();
+    applyFilters();
+  });
 
   // ─────────────────────────────────────────────────────────────────────────
 

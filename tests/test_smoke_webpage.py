@@ -479,10 +479,8 @@ def test_schedule_export_downloads_csv(server):
         browser.close()
 
 
-@pytest.mark.xfail(reason="superseded by import-modal flow, rewritten in Task 10")
 def test_schedule_import_replaces_state(tmp_path, server):
-    """Picking a CSV via the Import button replaces saved/purchased after confirm."""
-    # Build a CSV that marks the SEM session as purchased only.
+    """Action 'replace-mine' clears Mine and writes the imported saved/purchased."""
     csv_path = tmp_path / "schedule.csv"
     csv_path.write_text(
         "event_id,gencon_id,title,when,saved,purchased\n"
@@ -494,21 +492,146 @@ def test_schedule_import_replaces_state(tmp_path, server):
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector("#f-import", state="attached")
-        # Auto-accept the confirm dialog.
-        page.on("dialog", lambda d: d.accept())
-        # Upload the file via the hidden file input.
         page.set_input_files("#f-import", str(csv_path))
-        # After import: toolbar count = 0 saved, but ★ Saved button updates to 0.
-        page.wait_for_function(
-            "document.querySelector('#s-saved').textContent.includes('(0)')"
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # 'replace-mine' is default when CSV has no name.
+        assert page.query_selector("input[value=replace-mine]").is_checked()
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        purchased = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.purchased.v2') || '[]')"
         )
-        # The SEM row now has the 🎟 mark; the BGM row has none.
-        sem_row_marks = page.eval_on_selector_all(
-            ".row .marks", "els => els.map(e => e.textContent)"
+        assert "SEM26ND000005" in purchased
+        ctx.close()
+        browser.close()
+
+
+def test_import_add_to_mine_unions(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            "localStorage.setItem('gencon-enricher.saved.v2', JSON.stringify(['BGM26ND000001']))"
         )
-        joined = "|".join(sem_row_marks)
-        assert "🎟" in joined  # purchased SEM row shows the ticket glyph
-        assert "★" not in joined  # nothing saved
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        page.click("input[value=add-mine]")
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        saved = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.saved.v2') || '[]')"
+        )
+        assert "BGM26ND000001" in saved
+        assert "SEM26ND000005" in saved
+        ctx.close()
+        browser.close()
+
+
+def test_import_new_friend_list_creates_collection(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000005,SEM26ND000005,Cosplay 101,2026-07-31T10:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Smart default: name=Alice with no existing matching collection
+        # → 'new-list' pre-selected, name pre-filled.
+        assert page.query_selector("input[value=new-list]").is_checked()
+        assert page.query_selector("#new-list-name").input_value() == "Alice"
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert len(collections) == 1
+        assert collections[0]["name"] == "Alice"
+        assert "SEM26ND000005" in collections[0]["saved"]
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        ctx.close()
+        browser.close()
+
+
+def test_import_replace_existing_list_when_name_matches(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Alice\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000001,BGM26ND000001,Wingspan,2026-07-30T09:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Smart default: name matches existing → 'replace-list' selected with Alice.
+        assert page.query_selector("input[value=replace-list]").is_checked()
+        assert page.query_selector("#replace-list-select").input_value() == "c-alice"
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert len(collections) == 1
+        assert collections[0]["id"] == "c-alice"
+        assert collections[0]["color"] == "#e76f51"
+        assert collections[0]["saved"] == ["BGM26ND000001"]
+        ctx.close()
+        browser.close()
+
+
+def test_import_into_mine_with_name_writes_my_name(tmp_path, server):
+    csv_path = tmp_path / "schedule.csv"
+    csv_path.write_text(
+        "# name=Bob\n"
+        "event_id,gencon_id,title,when,saved,purchased\n"
+        "000001,BGM26ND000001,Wingspan,2026-07-30T09:00:00,1,0\n"
+    )
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-import", state="attached")
+        page.set_input_files("#f-import", str(csv_path))
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        # Override smart default — pick replace-mine.
+        page.click("input[value=replace-mine]")
+        page.click("#import-confirm")
+        page.wait_for_selector("#import-modal.hidden", state="attached")
+        my_name = page.evaluate(
+            "localStorage.getItem('gencon-enricher.my-name.v1')"
+        )
+        assert my_name == "Bob"
         ctx.close()
         browser.close()
 

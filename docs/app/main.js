@@ -8,7 +8,7 @@ import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
-import { listCollections, createCollection, replaceCollection, findByName, getMyName, setMyName } from './collections.js';
+import { listCollections, createCollection, replaceCollection, findByName, getMyName, setMyName, getCollection } from './collections.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -311,9 +311,7 @@ async function main() {
 
   function attachScheduleHandlers() {
     document.querySelector('#f-export').addEventListener('click', () => {
-      const csv = exportSchedule(blob.groups, getSaved(), getPurchased());
-      const today = new Date().toISOString().slice(0, 10);
-      triggerDownload(`gencon-schedule-${today}.csv`, csv);
+      openExportModal();
     });
     document.querySelector('#f-import').addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -508,7 +506,10 @@ async function main() {
   }
 
   document.querySelector('#import-modal .cancel-btn').addEventListener('click', closeImportModal);
-  document.querySelector('#modal-backdrop').addEventListener('click', closeImportModal);
+  document.querySelector('#modal-backdrop').addEventListener('click', () => {
+    closeImportModal();
+    closeExportModal();
+  });
 
   document.querySelector('#import-confirm').addEventListener('click', () => {
     if (!pendingImportResult) { closeImportModal(); return; }
@@ -547,6 +548,73 @@ async function main() {
     }
     closeImportModal();
     applyFilters();
+  });
+
+  // ── Export modal ──────────────────────────────────────────────────────────
+
+  function openExportModal() {
+    const modal = document.querySelector('#export-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    const sources = modal.querySelector('#export-sources');
+    const collections = listCollections();
+    let html = `
+      <label class="action-row">
+        <input type="radio" name="export-source" value="mine" checked>
+        <span>My events (saved: ${getSaved().size}, purchased: ${getPurchased().size})</span>
+      </label>
+    `;
+    for (const c of collections) {
+      html += `
+        <label class="action-row">
+          <input type="radio" name="export-source" value="${escapeAttr(c.id)}">
+          <span><span class="swatch" style="background:${escapeAttr(c.color)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${escapeHtml(c.name)} (saved: ${c.saved.length}, purchased: ${c.purchased.length})</span>
+        </label>
+      `;
+    }
+    sources.innerHTML = html;
+    const nameInput = modal.querySelector('#export-name');
+    nameInput.value = getMyName();
+    sources.querySelectorAll('input[name=export-source]').forEach(r => {
+      r.addEventListener('change', () => {
+        if (r.value === 'mine') nameInput.value = getMyName();
+        else {
+          const c = getCollection(r.value);
+          nameInput.value = c ? c.name : '';
+        }
+      });
+    });
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeExportModal() {
+    document.querySelector('#export-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+  }
+
+  document.querySelector('#export-modal .cancel-btn').addEventListener('click', closeExportModal);
+
+  document.querySelector('#export-confirm').addEventListener('click', () => {
+    const sel = document.querySelector('input[name=export-source]:checked')?.value;
+    const name = document.querySelector('#export-name').value.trim();
+    let saved, purchased;
+    if (sel === 'mine') {
+      saved = getSaved();
+      purchased = getPurchased();
+    } else {
+      const c = getCollection(sel);
+      if (!c) return;
+      saved = new Set(c.saved);
+      purchased = new Set(c.purchased);
+    }
+    const csv = exportSchedule(blob.groups, saved, purchased, { name });
+    const today = new Date().toISOString().slice(0, 10);
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const fname = slug
+      ? `gencon-schedule-${slug}-${today}.csv`
+      : `gencon-schedule-${today}.csv`;
+    triggerDownload(fname, csv);
+    closeExportModal();
   });
 
   // ─────────────────────────────────────────────────────────────────────────

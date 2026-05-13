@@ -455,26 +455,29 @@ def test_type_clear_all_then_select_all(server):
 
 
 def test_schedule_export_downloads_csv(server):
-    """The Export schedule button triggers a CSV download with marked sessions."""
+    """Export modal lets user pick Mine + name, then downloads CSV with metadata."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")
-        # Save the BGM (Wingspan) session.
+        # Save the BGM session.
         page.click(".row")
         page.click("#detail-panel .save-toggle")
-        # Trigger export and capture the download.
+        # Open export modal.
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        # Mine is default; type a name.
+        page.fill("#export-name", "Bob")
         with page.expect_download() as info:
-            page.click("#f-export")
+            page.click("#export-confirm")
         dl = info.value
-        path = dl.path()
-        body = Path(path).read_text()
+        body = Path(dl.path()).read_text()
         lines = body.strip().split("\n")
-        # Header + 1 data row for the saved session.
-        assert lines[0] == "event_id,gencon_id,title,when,saved,purchased"
-        assert any("BGM26ND000001" in ln and "1,0" in ln for ln in lines[1:])
+        assert lines[0] == "# name=Bob"
+        assert lines[1] == "event_id,gencon_id,title,when,saved,purchased"
+        assert any("BGM26ND000001" in ln and "1,0" in ln for ln in lines[2:])
         ctx.close()
         browser.close()
 
@@ -1591,5 +1594,46 @@ def test_import_modal_opens_with_summary(tmp_path, server):
         # Cancel closes the modal without changing storage.
         page.click("#import-modal .cancel-btn")
         page.wait_for_selector("#import-modal.hidden", state="attached")
+        ctx.close()
+        browser.close()
+
+
+def test_export_prefills_my_name(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate("localStorage.setItem('gencon-enricher.my-name.v1', 'Carol')")
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        assert page.query_selector("#export-name").input_value() == "Carol"
+        ctx.close()
+        browser.close()
+
+
+def test_export_friend_list_prefills_list_name(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.click("#f-export")
+        page.wait_for_selector("#export-modal:not(.hidden)")
+        page.click("input[name=export-source][value=c-alice]")
+        assert page.query_selector("#export-name").input_value() == "Alice"
         ctx.close()
         browser.close()

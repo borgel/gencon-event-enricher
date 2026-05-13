@@ -69,6 +69,23 @@
   </div>
 </div>
 
+<div id="export-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <h3>Export collection</h3>
+    <form id="export-form">
+      <div id="export-sources"></div>
+      <label class="action-row">
+        <span>Name for this export:</span>
+        <input type="text" id="export-name" placeholder="Your name">
+      </label>
+    </form>
+    <div class="modal-actions">
+      <button type="button" class="cancel-btn">Cancel</button>
+      <button type="button" class="confirm-btn" id="export-confirm">Download</button>
+    </div>
+  </div>
+</div>
+
 <script type="module" src="app/main.js"></script>
 </body>
 </html>

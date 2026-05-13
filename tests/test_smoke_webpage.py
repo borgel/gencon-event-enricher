@@ -1364,3 +1364,33 @@ def test_row_badges_hidden_when_collection_unchecked_and_others_active(server):
         assert len(dots) == 0
         ctx.close()
         browser.close()
+
+
+def test_timeline_blocks_show_friend_dots(server):
+    """Alice's session appears on the timeline as a friend block with her dot."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        # Activate Alice's list, then switch to timeline.
+        page.click("#friends-lists .friend-list-row input[type=checkbox]")
+        page.evaluate("location.hash = 'view=timeline&lists=c-alice'")
+        page.wait_for_selector("#results-timeline .tl-event")
+        dots = page.query_selector_all("#results-timeline .tl-event .friend-dot")
+        assert len(dots) >= 1, "expected at least one friend-dot on a timeline block"
+        styles = [d.get_attribute("style") or "" for d in dots]
+        assert any("#e76f51" in s for s in styles), "expected Alice's color on a dot"
+        ctx.close()
+        browser.close()

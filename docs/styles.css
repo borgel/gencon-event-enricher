@@ -281,6 +281,33 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 .tl-out.before { top: 2px; }
 .tl-out.after { bottom: 2px; }
 
+.tl-event.tl-friend {
+  background: #f4f5fa;
+  border: 1px dashed #b8bcc8;
+  color: #555;
+}
+.tl-event .tl-dots {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+.tl-event .tl-dots .friend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.tl-event .tl-dots .friend-dot-more {
+  font-size: 9px;
+  color: #2a2c30;
+  background: rgba(255,255,255,0.8);
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
 #results-toolbar #s-timeline.active {
   background: var(--accent); color: #fff; border-color: var(--accent);
 }

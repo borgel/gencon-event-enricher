@@ -30,10 +30,10 @@ export function createTimelineView({ container, onEventClick }) {
     //   outline + "!" badge. Computed by callers from groupOverlapMap.
     // previewGroup: a single group whose sessions render as preview blocks
     //   (overrides saved/purchased for those sessions). null when no detail panel open.
-    render(allGroups, savedIds, purchasedIds, conflictedSessionIds, previewGroup) {
+    render(allGroups, savedIds, purchasedIds, conflictedSessionIds, previewGroup, visibleCollections) {
       const days = collectDays(allGroups);
       const sessionsByDay = bucketSessions(
-        allGroups, days, savedIds, purchasedIds, previewGroup,
+        allGroups, days, savedIds, purchasedIds, previewGroup, visibleCollections,
       );
 
       container.innerHTML = '';
@@ -42,7 +42,7 @@ export function createTimelineView({ container, onEventClick }) {
       root.appendChild(renderHourRail());
       for (const day of days) {
         root.appendChild(renderDayColumn(
-          day, sessionsByDay.get(day) || [], conflictedSessionIds, onEventClick,
+          day, sessionsByDay.get(day) || [], conflictedSessionIds, onEventClick, visibleCollections,
         ));
       }
       container.appendChild(root);
@@ -61,9 +61,15 @@ function collectDays(allGroups) {
   return [...dayKeys].sort();
 }
 
-function bucketSessions(allGroups, days, savedIds, purchasedIds, previewGroup) {
+function bucketSessions(allGroups, days, savedIds, purchasedIds, previewGroup, visibleCollections) {
   const out = new Map();
   for (const day of days) out.set(day, []);
+  // Build a union of all gencon_ids that any visible collection has flagged.
+  const friendSessionIds = new Set();
+  for (const c of (visibleCollections || [])) {
+    for (const sid of c.saved || []) friendSessionIds.add(sid);
+    for (const sid of c.purchased || []) friendSessionIds.add(sid);
+  }
   for (const g of allGroups) {
     for (const s of g.sessions || []) {
       if (!s.start || !s.end || !s.gencon_id) continue;
@@ -73,6 +79,7 @@ function bucketSessions(allGroups, days, savedIds, purchasedIds, previewGroup) {
       if (previewGroup && g.key === previewGroup.key) kind = 'preview';
       else if (purchasedIds.has(s.gencon_id)) kind = 'purchased';
       else if (savedIds.has(s.gencon_id)) kind = 'saved';
+      else if (friendSessionIds.has(s.gencon_id)) kind = 'friend';
       if (!kind) continue;
       out.get(day).push({ ...s, _group: g, _kind: kind });
     }
@@ -101,7 +108,7 @@ function renderHourRail() {
   return rail;
 }
 
-function renderDayColumn(day, daySessions, conflictedSessionIds, onEventClick) {
+function renderDayColumn(day, daySessions, conflictedSessionIds, onEventClick, visibleCollections) {
   const sorted = [...daySessions].sort((a, b) =>
     a.start < b.start ? -1 : a.start > b.start ? 1 : 0,
   );
@@ -126,13 +133,13 @@ function renderDayColumn(day, daySessions, conflictedSessionIds, onEventClick) {
 
   for (const s of sorted) {
     body.appendChild(renderEvent(
-      s, tracks.get(s.gencon_id), trackCount, conflictedSessionIds, onEventClick,
+      s, tracks.get(s.gencon_id), trackCount, conflictedSessionIds, onEventClick, visibleCollections,
     ));
   }
   return col;
 }
 
-function renderEvent(s, trackIdx, trackCount, conflictedSessionIds, onEventClick) {
+function renderEvent(s, trackIdx, trackCount, conflictedSessionIds, onEventClick, visibleCollections) {
   const startMin = isoToMinutesOfDay(s.start);
   const endMin = isoToMinutesOfDay(s.end);
   const winStart = WINDOW_START_HOUR * 60;
@@ -165,6 +172,31 @@ function renderEvent(s, trackIdx, trackCount, conflictedSessionIds, onEventClick
     <div class="tl-meta">${formatTime(startMin)}–${formatTime(endMin)}${s.location ? ' · ' + escape(s.location) : ''}</div>
     ${afterWindow ? '<span class="tl-out after">→</span>' : ''}
   `;
+  // Append per-collection dots for collections that flagged this session.
+  const matches = (visibleCollections || []).filter(c =>
+    (c.saved || []).includes(s.gencon_id) || (c.purchased || []).includes(s.gencon_id)
+  );
+  if (matches.length > 0) {
+    const dotsEl = document.createElement('span');
+    dotsEl.className = 'tl-dots';
+    const shown = matches.slice(0, 4);
+    const extra = matches.length - shown.length;
+    for (const c of shown) {
+      const d = document.createElement('span');
+      d.className = 'friend-dot';
+      d.setAttribute('style', 'background:' + c.color);
+      d.title = c.name;
+      dotsEl.appendChild(d);
+    }
+    if (extra > 0) {
+      const more = document.createElement('span');
+      more.className = 'friend-dot-more';
+      more.textContent = `+${extra}`;
+      dotsEl.appendChild(more);
+    }
+    el.appendChild(dotsEl);
+  }
+
   el.addEventListener('click', () => onEventClick && onEventClick(s._group, s));
   return el;
 }

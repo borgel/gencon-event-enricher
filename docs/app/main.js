@@ -446,6 +446,7 @@ async function main() {
         purchased,
         conflictedSessionIds,
         openGroup,
+        visibleCollections,
       );
     } else {
       $('#results-timeline').classList.add('hidden');

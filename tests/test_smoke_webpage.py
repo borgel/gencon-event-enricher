@@ -1282,17 +1282,21 @@ def test_friends_lists_section_appears_with_collections(server):
 
 
 def test_friends_lists_section_hidden_when_no_collections(server):
-    """No section when no collections exist."""
+    """No section content when no collections; element exists but is hidden."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(server, wait_until="networkidle")
         page.wait_for_selector(".row")
-        # Clear any test residue
         page.evaluate("localStorage.removeItem('gencon-enricher.collections.v1')")
         page.reload(wait_until="networkidle")
         page.wait_for_selector(".row")
-        assert page.query_selector("#friends-lists") is None
+        el = page.query_selector("#friends-lists")
+        assert el is not None
+        # Element is hidden (has 'hidden' class, no content).
+        klass = el.get_attribute("class") or ""
+        assert "hidden" in klass.split()
+        assert (el.inner_text() or "").strip() == ""
         ctx.close()
         browser.close()

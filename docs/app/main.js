@@ -270,7 +270,8 @@ async function main() {
     if (!container) return;
     const collections = listCollections();
     if (collections.length === 0) {
-      container.remove();
+      container.classList.add('hidden');
+      container.innerHTML = '';
       return;
     }
     container.classList.remove('hidden');
@@ -299,7 +300,6 @@ async function main() {
         applyFilters();
       });
     });
-    // Manage link: placeholder until Task 11 wires the modal.
     const manageLink = container.querySelector('#manage-collections-link');
     if (manageLink) {
       manageLink.addEventListener('click', (e) => {

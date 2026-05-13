@@ -50,12 +50,22 @@ export function createTimelineView({ container, onEventClick }) {
   };
 }
 
-function collectDays(allGroups) {
+// GenCon 2026 official days: Thu 2026-07-30 through Sun 2026-08-02.
+// Some sessions in the dataset start on pre-con setup days (e.g. Wed 7/29)
+// or post-con (e.g. exhibitor breakdown Fri 8/7); those are out-of-scope
+// for the timeline view, so we intersect any data-present day against this
+// window before rendering columns.
+const CON_DAYS = new Set([
+  '2026-07-30', '2026-07-31', '2026-08-01', '2026-08-02',
+]);
+
+export function collectDays(allGroups) {
   const dayKeys = new Set();
   for (const g of allGroups) {
     for (const s of g.sessions || []) {
       if (!s.start) continue;
-      dayKeys.add(String(s.start).slice(0, 10));
+      const k = String(s.start).slice(0, 10);
+      if (CON_DAYS.has(k)) dayKeys.add(k);
     }
   }
   return [...dayKeys].sort();

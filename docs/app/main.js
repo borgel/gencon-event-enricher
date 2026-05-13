@@ -8,7 +8,11 @@ import { createDetailView } from './view-detail.js';
 import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
-import { listCollections, createCollection, replaceCollection, findByName, getMyName, setMyName, getCollection } from './collections.js';
+import {
+  listCollections, createCollection, replaceCollection, findByName,
+  getMyName, setMyName, getCollection,
+  renameCollection, deleteCollection,
+} from './collections.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -304,7 +308,7 @@ async function main() {
     if (manageLink) {
       manageLink.addEventListener('click', (e) => {
         e.preventDefault();
-        console.log('manage clicked');
+        openManageModal();
       });
     }
   }
@@ -509,6 +513,7 @@ async function main() {
   document.querySelector('#modal-backdrop').addEventListener('click', () => {
     closeImportModal();
     closeExportModal();
+    closeManageModal();
   });
 
   document.querySelector('#import-confirm').addEventListener('click', () => {
@@ -593,6 +598,89 @@ async function main() {
   }
 
   document.querySelector('#export-modal .cancel-btn').addEventListener('click', closeExportModal);
+
+  // ── Manage modal ──────────────────────────────────────────────────────────
+
+  function openManageModal() {
+    const modal = document.querySelector('#manage-modal');
+    const backdrop = document.querySelector('#modal-backdrop');
+    renderManageRows();
+    modal.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+  }
+
+  function closeManageModal() {
+    document.querySelector('#manage-modal').classList.add('hidden');
+    document.querySelector('#modal-backdrop').classList.add('hidden');
+  }
+
+  function renderManageRows() {
+    const container = document.querySelector('#manage-rows');
+    const collections = listCollections();
+    if (collections.length === 0) {
+      container.innerHTML = '<p class="muted">No friend\'s lists yet.</p>';
+      return;
+    }
+    container.innerHTML = collections.map(c => {
+      const imported = (c.importedAt || '').slice(0, 10);
+      return `
+        <div class="manage-row" data-id="${escapeAttr(c.id)}">
+          <div class="manage-row-head">
+            <span class="swatch" style="background:${escapeAttr(c.color)}"></span>
+            <span class="name">${escapeHtml(c.name)}</span>
+          </div>
+          <div class="manage-row-meta">
+            ${c.saved.length} saved, ${c.purchased.length} purchased · imported ${imported}
+          </div>
+          <div class="manage-row-actions">
+            <button type="button" class="rename-btn">Rename</button>
+            <button type="button" class="export-btn">Export</button>
+            <button type="button" class="delete-btn">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    container.querySelectorAll('.rename-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        const cur = getCollection(id);
+        const next = window.prompt('New name:', cur?.name || '');
+        if (next == null) return;
+        const trimmed = next.trim();
+        if (!trimmed) return;
+        renameCollection(id, trimmed);
+        renderManageRows();
+        renderFriendsLists();
+        applyFilters();
+      });
+    });
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        const cur = getCollection(id);
+        if (!window.confirm(`Delete "${cur?.name ?? id}"?`)) return;
+        deleteCollection(id);
+        state.activeListIds.delete(id);
+        renderManageRows();
+        renderFriendsLists();
+        applyFilters();
+      });
+    });
+    container.querySelectorAll('.export-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.manage-row').dataset.id;
+        closeManageModal();
+        openExportModal();
+        const radio = document.querySelector(`input[name=export-source][value="${id}"]`);
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+  }
+
+  document.querySelector('#manage-modal .cancel-btn').addEventListener('click', closeManageModal);
 
   document.querySelector('#export-confirm').addEventListener('click', () => {
     const sel = document.querySelector('input[name=export-source]:checked')?.value;

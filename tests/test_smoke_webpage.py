@@ -1637,3 +1637,70 @@ def test_export_friend_list_prefills_list_name(server):
         assert page.query_selector("#export-name").input_value() == "Alice"
         ctx.close()
         browser.close()
+
+
+def test_manage_modal_rename(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        # Open manage modal.
+        page.click("#manage-collections-link")
+        page.wait_for_selector("#manage-modal:not(.hidden)")
+        # Accept the rename prompt with new value.
+        page.on("dialog", lambda d: d.accept("Alice K"))
+        page.click("#manage-modal .manage-row[data-id='c-alice'] .rename-btn")
+        page.wait_for_function(
+            "document.querySelector('#friends-lists .friend-list-row .name').textContent === 'Alice K'"
+        )
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert collections[0]["name"] == "Alice K"
+        assert collections[0]["originalExportName"] == "Alice"
+        ctx.close()
+        browser.close()
+
+
+def test_manage_modal_delete(server):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.evaluate(
+            """
+            localStorage.setItem('gencon-enricher.collections.v1', JSON.stringify([{
+                id: 'c-alice', name: 'Alice', color: '#e76f51',
+                saved: ['SEM26ND000005'], purchased: [],
+                importedAt: '2026-05-13T00:00:00Z', originalExportName: 'Alice'
+            }]));
+            """
+        )
+        page.reload(wait_until="networkidle")
+        page.wait_for_selector("#friends-lists .friend-list-row")
+        page.click("#manage-collections-link")
+        page.wait_for_selector("#manage-modal:not(.hidden)")
+        page.on("dialog", lambda d: d.accept())
+        page.click("#manage-modal .manage-row[data-id='c-alice'] .delete-btn")
+        page.wait_for_function(
+            "document.querySelector('#friends-lists').classList.contains('hidden')"
+        )
+        collections = page.evaluate(
+            "JSON.parse(localStorage.getItem('gencon-enricher.collections.v1') || '[]')"
+        )
+        assert collections == []
+        ctx.close()
+        browser.close()

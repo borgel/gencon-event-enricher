@@ -70,6 +70,12 @@ export function installModals(_deps) {
   document.querySelector('#paste-modal .cancel-btn').addEventListener('click', closePasteModal);
   document.querySelector('#share-copy').addEventListener('click', copyShareBlob);
   document.querySelector('#paste-decode').addEventListener('click', decodePasteBlob);
+  document.querySelector('#share-name').addEventListener('input', () => {
+    regenerateShareBlob(
+      currentShareSource,
+      document.querySelector('#share-name').value.trim(),
+    );
+  });
 }
 
 // ── Import ────────────────────────────────────────────────────────────────
@@ -180,7 +186,7 @@ function renderExportSources(container, radioName, onSelect) {
     `;
   }
   container.innerHTML = html;
-  container.querySelectorAll(`input[name=${radioName}]`).forEach(r => {
+  container.querySelectorAll(`input[name="${radioName}"]`).forEach(r => {
     r.addEventListener('change', () => { if (r.checked) onSelect(r.value); });
   });
 }
@@ -246,6 +252,7 @@ function confirmExport() {
 // Increments on every regenerate; lets us drop stale async results when
 // the user changes source/name before the previous encode resolves.
 let shareGen = 0;
+let currentShareSource = 'mine';
 
 export function openShareModal() {
   const modal = document.querySelector('#share-modal');
@@ -256,21 +263,18 @@ export function openShareModal() {
   statusEl.textContent = '';
   nameInput.value = getMyName();
 
-  let currentSource = 'mine';
+  currentShareSource = 'mine';
   renderExportSources(sources, 'share-source', (value) => {
-    currentSource = value;
+    currentShareSource = value;
     if (value === 'mine') nameInput.value = getMyName();
     else {
       const c = getCollection(value);
       nameInput.value = c ? c.name : '';
     }
-    regenerateShareBlob(currentSource, nameInput.value.trim());
-  });
-  nameInput.addEventListener('input', () => {
-    regenerateShareBlob(currentSource, nameInput.value.trim());
+    regenerateShareBlob(currentShareSource, nameInput.value.trim());
   });
 
-  regenerateShareBlob(currentSource, nameInput.value.trim());
+  regenerateShareBlob(currentShareSource, nameInput.value.trim());
   modal.classList.remove('hidden');
   backdrop.classList.remove('hidden');
 }
@@ -350,10 +354,6 @@ async function decodePasteBlob() {
     return;
   }
   const result = parseScheduleCSV(recovered, deps.blob.groups);
-  if (result.matched === 0 && result.missed === 0) {
-    setPasteError("Decoded successfully but no sessions were found in the blob.");
-    return;
-  }
   closePasteModal();
   openImportModal(result);
 }

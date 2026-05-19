@@ -1,5 +1,6 @@
 """End-to-end webpage smoke test using Playwright + a tiny on-disk events.json."""
 import json
+import re
 import threading
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -1184,6 +1185,114 @@ def test_desktop_hamburger_visible(server):
             "#hamburger", "e => getComputedStyle(e).display"
         )
         assert ham_display != "none"
+        ctx.close()
+        browser.close()
+
+
+def test_sidebar_schedule_section_layout(server):
+    """Share/Paste are prominent; CSV controls are inside a closed <details>."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-share")
+        page.wait_for_selector("#f-paste")
+        # CSV controls live inside the details disclosure.
+        details = page.query_selector("details.csv-advanced")
+        assert details is not None
+        # Closed by default.
+        is_open = page.evaluate(
+            "document.querySelector('details.csv-advanced').open"
+        )
+        assert is_open is False
+        # CSV controls still attached (just inside the details).
+        assert page.query_selector("details.csv-advanced #f-export") is not None
+        assert page.query_selector("details.csv-advanced #f-import") is not None
+        ctx.close()
+        browser.close()
+
+
+def test_share_modal_generates_blob_with_prefix(server):
+    """Clicking Share opens the modal and fills the textarea with GENCON1:…"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(
+            permissions=["clipboard-read", "clipboard-write"],
+        )
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Save a session so the export has content.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        page.click("#f-share")
+        page.wait_for_selector("#share-modal:not(.hidden)")
+        # Wait for the async encode to land in the textarea.
+        page.wait_for_function(
+            "document.querySelector('#share-blob').value.startsWith('GENCON1:')"
+        )
+        blob = page.input_value("#share-blob")
+        assert blob.startswith("GENCON1:")
+        # Body is urlsafe-base64 only.
+        body = blob[len("GENCON1:"):]
+        assert re.fullmatch(r"[A-Za-z0-9_-]+", body)
+        ctx.close()
+        browser.close()
+
+
+def test_paste_modal_decodes_blob_into_import_flow(server):
+    """Share → copy blob → Paste → Decode opens the action-radio import modal."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector(".row")
+        # Save a session so Share has content to encode.
+        page.click(".row")
+        page.click("#detail-panel .save-toggle")
+        # Open Share modal, grab the generated blob text.
+        page.click("#f-share")
+        page.wait_for_selector("#share-modal:not(.hidden)")
+        page.wait_for_function(
+            "document.querySelector('#share-blob').value.startsWith('GENCON1:')"
+        )
+        blob = page.input_value("#share-blob")
+        page.click("#share-modal .cancel-btn")
+        page.wait_for_selector("#share-modal.hidden", state="attached")
+        # Open Paste, paste the blob, decode it.
+        page.click("#f-paste")
+        page.wait_for_selector("#paste-modal:not(.hidden)")
+        page.fill("#paste-blob", blob)
+        page.click("#paste-decode")
+        # Paste modal closes; the existing import-action modal opens.
+        page.wait_for_selector("#paste-modal.hidden", state="attached")
+        page.wait_for_selector("#import-modal:not(.hidden)")
+        summary = page.text_content("#import-modal .summary")
+        assert "matched" in summary.lower()
+        ctx.close()
+        browser.close()
+
+
+def test_paste_modal_shows_error_for_garbage(server):
+    """Pasting non-blob text shows the missing-prefix error."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-paste")
+        page.click("#f-paste")
+        page.wait_for_selector("#paste-modal:not(.hidden)")
+        page.fill("#paste-blob", "hello no blob here")
+        page.click("#paste-decode")
+        # Error region becomes visible.
+        page.wait_for_selector("#paste-error:not(.hidden)")
+        msg = page.text_content("#paste-error")
+        assert "GENCON1" in msg
+        # The import modal must NOT have opened.
+        assert page.query_selector("#import-modal.hidden") is not None
         ctx.close()
         browser.close()
 

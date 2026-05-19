@@ -1270,7 +1270,9 @@ def test_paste_modal_decodes_blob_into_import_flow(server):
         page.wait_for_selector("#paste-modal.hidden", state="attached")
         page.wait_for_selector("#import-modal:not(.hidden)")
         summary = page.text_content("#import-modal .summary")
-        assert "matched" in summary.lower()
+        m = re.match(r"(\d+) sessions matched", summary.strip())
+        assert m is not None, f"unexpected summary format: {summary!r}"
+        assert int(m.group(1)) >= 1, f"round-trip matched 0 sessions: {summary!r}"
         ctx.close()
         browser.close()
 
@@ -1291,6 +1293,28 @@ def test_paste_modal_shows_error_for_garbage(server):
         page.wait_for_selector("#paste-error:not(.hidden)")
         msg = page.text_content("#paste-error")
         assert "GENCON1" in msg
+        # The import modal must NOT have opened.
+        assert page.query_selector("#import-modal.hidden") is not None
+        ctx.close()
+        browser.close()
+
+
+def test_paste_modal_shows_error_for_corrupted_blob(server):
+    """Pasting text with GENCON1: but a broken payload shows the corrupted message."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(server, wait_until="networkidle")
+        page.wait_for_selector("#f-paste")
+        page.click("#f-paste")
+        page.wait_for_selector("#paste-modal:not(.hidden)")
+        # Has the prefix but the payload is not valid base64-deflate.
+        page.fill("#paste-blob", "GENCON1:not_a_real_payload")
+        page.click("#paste-decode")
+        page.wait_for_selector("#paste-error:not(.hidden)")
+        msg = page.text_content("#paste-error")
+        assert "corrupted" in msg.lower()
         # The import modal must NOT have opened.
         assert page.query_selector("#import-modal.hidden") is not None
         ctx.close()

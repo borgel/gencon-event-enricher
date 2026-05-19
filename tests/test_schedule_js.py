@@ -3,6 +3,7 @@
 Mirrors the harness pattern used in test_filters_js.py / test_sort_js.py.
 """
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -304,3 +305,105 @@ def test_export_strips_newlines_from_name(page):
     assert obj["firstLine"] == "# name=Alice Bob"
     assert obj["name"] == "Alice Bob"
     assert obj["matched"] == 1
+
+
+def test_encode_blob_has_prefix_and_urlsafe_alphabet(page):
+    """Encoded blob starts with GENCON1: and only uses [A-Za-z0-9_-]."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set());
+    const blob = await S.encodeBlob(csv);
+    return blob;
+    """
+    blob = page.evaluate(f"(async () => {{ {js} }})()")
+    assert blob.startswith("GENCON1:")
+    body = blob[len("GENCON1:"):]
+    assert re.fullmatch(r"[A-Za-z0-9_-]+", body), f"non-urlsafe chars in {body!r}"
+
+
+def test_blob_roundtrip_preserves_saved_and_purchased(page):
+    """encodeBlob → decodeBlob → parseScheduleCSV yields the original sets."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const saved = new Set(['BGM26ND313243']);
+    const purchased = new Set(['RPG26ND400500']);
+    const csv = S.exportSchedule(groups, saved, purchased, {{name: 'Alice'}});
+    const blob = await S.encodeBlob(csv);
+    const recovered = await S.decodeBlob(blob);
+    const result = S.parseScheduleCSV(recovered, groups);
+    return JSON.stringify({{
+      name: result.name,
+      saved: [...result.saved].sort(),
+      purchased: [...result.purchased].sort(),
+      matched: result.matched,
+      missed: result.missed,
+    }});
+    """
+    obj = json.loads(page.evaluate(f"(async () => {{ {js} }})()"))
+    assert obj["name"] == "Alice"
+    assert obj["saved"] == ["BGM26ND313243"]
+    assert obj["purchased"] == ["RPG26ND400500"]
+    assert obj["matched"] == 2
+    assert obj["missed"] == 0
+
+
+def test_decode_blob_tolerates_surrounding_text(page):
+    """A blob embedded in chat-style prose still decodes."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set());
+    const blob = await S.encodeBlob(csv);
+    const wrapped = 'hey check this out\\n' + blob + '\\nthanks!';
+    const recovered = await S.decodeBlob(wrapped);
+    return recovered;
+    """
+    recovered = page.evaluate(f"(async () => {{ {js} }})()")
+    assert recovered is not None
+    assert "event_id,gencon_id,title,when,saved,purchased" in recovered
+
+
+def test_decode_blob_returns_null_for_garbage(page):
+    """No GENCON1: token → null (not a throw)."""
+    js = "return await S.decodeBlob('hello world, no schedule here');"
+    out = page.evaluate(f"(async () => {{ {js} }})()")
+    assert out is None
+
+
+def test_decode_blob_returns_null_for_corrupted_payload(page):
+    """A flipped character inside the payload returns null, not a throw."""
+    js = f"""
+    const groups = {json.dumps(_GROUPS)};
+    const csv = S.exportSchedule(groups, new Set(['BGM26ND313243']), new Set());
+    const blob = await S.encodeBlob(csv);
+    // Flip a char in the middle of the base64 body.
+    const head = 'GENCON1:';
+    const body = blob.slice(head.length);
+    const mid = Math.floor(body.length / 2);
+    const flipped = body[mid] === 'A' ? 'B' : 'A';
+    const corrupted = head + body.slice(0, mid) + flipped + body.slice(mid + 1);
+    return await S.decodeBlob(corrupted);
+    """
+    out = page.evaluate(f"(async () => {{ {js} }})()")
+    assert out is None
+
+
+def test_encode_blob_stays_compact_for_large_schedule(page):
+    """A synthesized 300-session schedule encodes under 8 KB (compression smoke)."""
+    js = """
+    const groups = [];
+    const saved = new Set();
+    for (let i = 0; i < 300; i++) {
+      const id = 'BGM26ND' + String(500000 + i).padStart(6, '0');
+      groups.push({
+        key: 'g-' + i,
+        title: 'Synthesized Game Title ' + i,
+        sessions: [{ gencon_id: id, start: '2026-07-31T10:00:00' }],
+      });
+      saved.add(id);
+    }
+    const csv = S.exportSchedule(groups, saved, new Set());
+    const blob = await S.encodeBlob(csv);
+    return blob.length;
+    """
+    size = page.evaluate(f"(async () => {{ {js} }})()")
+    assert size < 8192, f"blob is {size} bytes; expected < 8 KB"

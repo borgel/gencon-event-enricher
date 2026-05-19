@@ -214,6 +214,8 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 }
 #f-clear,
 #f-export,
+#f-share,
+#f-paste,
 .file-button {
   font: inherit;
   padding: 0.3rem 0.6rem;
@@ -229,6 +231,8 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 system-ui, -apple-system, san
 }
 .file-button:hover,
 #f-export:hover,
+#f-share:hover,
+#f-paste:hover,
 #f-clear:hover { background: #f0f0f0; }
 
 #detail-panel .session-fit {
@@ -657,34 +661,18 @@ body.drawer-open #drawer-backdrop {
 }
 .modal .copied-status {
   font-size: 12px;
-  color: #16a34a;
+  color: var(--good);
   margin-right: auto;
   align-self: center;
 }
 .modal .paste-error {
-  color: #dc2626;
+  color: var(--bad);
   font-size: 13px;
   margin: 4px 0 0;
 }
 .modal .paste-error.hidden { display: none; }
 
 /* Sidebar Schedule section: prominent blob buttons, demoted CSV details */
-#f-share,
-#f-paste {
-  font: inherit;
-  padding: 0.3rem 0.6rem;
-  width: 100%;
-  display: block;
-  margin-bottom: 4px;
-  text-align: center;
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 3px;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-#f-share:hover,
-#f-paste:hover { background: #f0f0f0; }
 details.csv-advanced {
   margin-top: 8px;
   font-size: 12px;

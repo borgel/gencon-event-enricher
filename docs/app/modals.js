@@ -11,7 +11,10 @@
 //   - openManageModal(): used by main.js when the rail's "Manage…" link is
 //     clicked. (Re-bound on every rail render.)
 
-import { parseScheduleCSV, exportSchedule, triggerDownload } from './schedule.js';
+import {
+  parseScheduleCSV, exportSchedule, triggerDownload,
+  encodeBlob, decodeBlob,
+} from './schedule.js';
 import {
   listCollections, createCollection, replaceCollection, findByName,
   getMyName, setMyName, getCollection,
@@ -56,10 +59,17 @@ export function installModals(_deps) {
     closeImportModal();
     closeExportModal();
     closeManageModal();
+    closeShareModal();
+    closePasteModal();
   });
 
   document.querySelector('#import-confirm').addEventListener('click', confirmImport);
   document.querySelector('#export-confirm').addEventListener('click', confirmExport);
+
+  document.querySelector('#share-modal .cancel-btn').addEventListener('click', closeShareModal);
+  document.querySelector('#paste-modal .cancel-btn').addEventListener('click', closePasteModal);
+  document.querySelector('#share-copy').addEventListener('click', copyShareBlob);
+  document.querySelector('#paste-decode').addEventListener('click', decodePasteBlob);
 }
 
 // ── Import ────────────────────────────────────────────────────────────────
@@ -150,36 +160,54 @@ function confirmImport() {
 
 // ── Export ────────────────────────────────────────────────────────────────
 
-function openExportModal() {
-  const modal = document.querySelector('#export-modal');
-  const backdrop = document.querySelector('#modal-backdrop');
-  const sources = modal.querySelector('#export-sources');
+// Renders the source picker (Mine + each friend's list) into `container`
+// using the radio group name `radioName`. Calls `onSelect(sourceValue)`
+// whenever the selection changes; the value is 'mine' or a collection id.
+function renderExportSources(container, radioName, onSelect) {
   const collections = listCollections();
   let html = `
     <label class="action-row">
-      <input type="radio" name="export-source" value="mine" checked>
+      <input type="radio" name="${escapeAttr(radioName)}" value="mine" checked>
       <span>My events (saved: ${getSaved().size}, purchased: ${getPurchased().size})</span>
     </label>
   `;
   for (const c of collections) {
     html += `
       <label class="action-row">
-        <input type="radio" name="export-source" value="${escapeAttr(c.id)}">
+        <input type="radio" name="${escapeAttr(radioName)}" value="${escapeAttr(c.id)}">
         <span><span class="swatch" style="background:${escapeAttr(c.color)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${escapeHtml(c.name)} (saved: ${c.saved.length}, purchased: ${c.purchased.length})</span>
       </label>
     `;
   }
-  sources.innerHTML = html;
+  container.innerHTML = html;
+  container.querySelectorAll(`input[name=${radioName}]`).forEach(r => {
+    r.addEventListener('change', () => { if (r.checked) onSelect(r.value); });
+  });
+}
+
+// Returns the {saved, purchased} sets for a source value ('mine' or a
+// collection id). Returns null if the collection is gone.
+function getSourceSets(sourceValue) {
+  if (sourceValue === 'mine') {
+    return { saved: getSaved(), purchased: getPurchased() };
+  }
+  const c = getCollection(sourceValue);
+  if (!c) return null;
+  return { saved: new Set(c.saved), purchased: new Set(c.purchased) };
+}
+
+function openExportModal() {
+  const modal = document.querySelector('#export-modal');
+  const backdrop = document.querySelector('#modal-backdrop');
+  const sources = modal.querySelector('#export-sources');
   const nameInput = modal.querySelector('#export-name');
   nameInput.value = getMyName();
-  sources.querySelectorAll('input[name=export-source]').forEach(r => {
-    r.addEventListener('change', () => {
-      if (r.value === 'mine') nameInput.value = getMyName();
-      else {
-        const c = getCollection(r.value);
-        nameInput.value = c ? c.name : '';
-      }
-    });
+  renderExportSources(sources, 'export-source', (value) => {
+    if (value === 'mine') nameInput.value = getMyName();
+    else {
+      const c = getCollection(value);
+      nameInput.value = c ? c.name : '';
+    }
   });
   modal.classList.remove('hidden');
   backdrop.classList.remove('hidden');
@@ -211,6 +239,123 @@ function confirmExport() {
     : `gencon-schedule-${today}.csv`;
   triggerDownload(fname, csv);
   closeExportModal();
+}
+
+// ── Share (base64 blob export) ────────────────────────────────────────────
+
+// Increments on every regenerate; lets us drop stale async results when
+// the user changes source/name before the previous encode resolves.
+let shareGen = 0;
+
+export function openShareModal() {
+  const modal = document.querySelector('#share-modal');
+  const backdrop = document.querySelector('#modal-backdrop');
+  const sources = modal.querySelector('#share-sources');
+  const nameInput = modal.querySelector('#share-name');
+  const statusEl = modal.querySelector('#share-copied-status');
+  statusEl.textContent = '';
+  nameInput.value = getMyName();
+
+  let currentSource = 'mine';
+  renderExportSources(sources, 'share-source', (value) => {
+    currentSource = value;
+    if (value === 'mine') nameInput.value = getMyName();
+    else {
+      const c = getCollection(value);
+      nameInput.value = c ? c.name : '';
+    }
+    regenerateShareBlob(currentSource, nameInput.value.trim());
+  });
+  nameInput.addEventListener('input', () => {
+    regenerateShareBlob(currentSource, nameInput.value.trim());
+  });
+
+  regenerateShareBlob(currentSource, nameInput.value.trim());
+  modal.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+}
+
+async function regenerateShareBlob(sourceValue, name) {
+  const textarea = document.querySelector('#share-blob');
+  const sets = getSourceSets(sourceValue);
+  if (!sets) { textarea.value = ''; return; }
+  const gen = ++shareGen;
+  const csv = exportSchedule(deps.blob.groups, sets.saved, sets.purchased, { name });
+  const blob = await encodeBlob(csv);
+  if (gen !== shareGen) return;  // a newer generation has started
+  textarea.value = blob;
+}
+
+function closeShareModal() {
+  document.querySelector('#share-modal').classList.add('hidden');
+  document.querySelector('#modal-backdrop').classList.add('hidden');
+}
+
+async function copyShareBlob() {
+  const textarea = document.querySelector('#share-blob');
+  const statusEl = document.querySelector('#share-copied-status');
+  const value = textarea.value;
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    statusEl.textContent = 'Copied!';
+    setTimeout(() => { statusEl.textContent = ''; }, 1500);
+  } catch {
+    // Fallback for browsers without clipboard permission: select the textarea
+    // so the user can Cmd-C / Ctrl-C themselves.
+    textarea.removeAttribute('readonly');
+    textarea.focus();
+    textarea.select();
+    textarea.setAttribute('readonly', '');
+    statusEl.textContent = 'Press Cmd-C / Ctrl-C to copy.';
+  }
+}
+
+// ── Paste (base64 blob import) ────────────────────────────────────────────
+
+export function openPasteModal() {
+  const modal = document.querySelector('#paste-modal');
+  const backdrop = document.querySelector('#modal-backdrop');
+  modal.querySelector('#paste-blob').value = '';
+  setPasteError('');
+  modal.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+}
+
+function closePasteModal() {
+  document.querySelector('#paste-modal').classList.add('hidden');
+  document.querySelector('#modal-backdrop').classList.add('hidden');
+}
+
+function setPasteError(msg) {
+  const el = document.querySelector('#paste-error');
+  if (!msg) { el.textContent = ''; el.classList.add('hidden'); return; }
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+async function decodePasteBlob() {
+  const text = document.querySelector('#paste-blob').value;
+  if (!text.trim()) {
+    setPasteError("Paste the shared text into the box first.");
+    return;
+  }
+  const recovered = await decodeBlob(text);
+  if (recovered == null) {
+    if (!/GENCON1:/.test(text)) {
+      setPasteError("Couldn't find a schedule blob in what you pasted. The text should start with `GENCON1:`.");
+    } else {
+      setPasteError("The blob looks corrupted — try copying it again from the source.");
+    }
+    return;
+  }
+  const result = parseScheduleCSV(recovered, deps.blob.groups);
+  if (result.matched === 0 && result.missed === 0) {
+    setPasteError("Decoded successfully but no sessions were found in the blob.");
+    return;
+  }
+  closePasteModal();
+  openImportModal(result);
 }
 
 // ── Manage ────────────────────────────────────────────────────────────────

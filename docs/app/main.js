@@ -8,7 +8,9 @@ import { createTimelineView } from './view-timeline.js';
 import { KEY_OPTIONS, LABELS, compareGroups } from './sort.js';
 import { groupOverlapMap } from './conflict.js';
 import { listCollections } from './collections.js';
-import { installModals, openManageModal } from './modals.js';
+import {
+  installModals, openManageModal, openShareModal, openPasteModal,
+} from './modals.js';
 
 const $ = (sel) => document.querySelector(sel);
 const groupsByKey = new Map();
@@ -100,9 +102,14 @@ function renderFilterRail(state, onChange) {
     </div>
     <div class="group">
       <div class="label">Schedule</div>
-      <button id="f-export" type="button">Export schedule</button>
-      <label class="file-button" for="f-import">Import schedule</label>
-      <input type="file" id="f-import" accept=".csv,text/csv" hidden>
+      <button id="f-share" type="button">Share schedule</button>
+      <button id="f-paste" type="button">Paste schedule</button>
+      <details class="csv-advanced">
+        <summary>Advanced (CSV file)</summary>
+        <button id="f-export" type="button">Export CSV</button>
+        <label class="file-button" for="f-import">Import CSV</label>
+        <input type="file" id="f-import" accept=".csv,text/csv" hidden>
+      </details>
     </div>
   `;
   $('#filter-rail').innerHTML = html;
@@ -139,6 +146,9 @@ function renderFilterRail(state, onChange) {
     e.target.classList.toggle('active');
     onChange();
   });
+
+  $('#f-share').addEventListener('click', openShareModal);
+  $('#f-paste').addEventListener('click', openPasteModal);
 }
 
 function renderResultsToolbar(state, onChange) {

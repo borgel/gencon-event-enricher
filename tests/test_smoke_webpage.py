@@ -465,7 +465,8 @@ def test_schedule_export_downloads_csv(server):
         # Save the BGM session.
         page.click(".row")
         page.click("#detail-panel .save-toggle")
-        # Open export modal.
+        # Open export modal (f-export lives inside a closed <details>; open it first).
+        page.evaluate("document.querySelector('details.csv-advanced').open = true")
         page.click("#f-export")
         page.wait_for_selector("#export-modal:not(.hidden)")
         # Mine is default; type a name.
@@ -1789,6 +1790,7 @@ def test_export_prefills_my_name(server):
         page.evaluate("localStorage.setItem('gencon-enricher.my-name.v1', 'Carol')")
         page.reload(wait_until="networkidle")
         page.wait_for_selector(".row")
+        page.evaluate("document.querySelector('details.csv-advanced').open = true")
         page.click("#f-export")
         page.wait_for_selector("#export-modal:not(.hidden)")
         assert page.query_selector("#export-name").input_value() == "Carol"
@@ -1813,6 +1815,7 @@ def test_export_friend_list_prefills_list_name(server):
         )
         page.reload(wait_until="networkidle")
         page.wait_for_selector(".row")
+        page.evaluate("document.querySelector('details.csv-advanced').open = true")
         page.click("#f-export")
         page.wait_for_selector("#export-modal:not(.hidden)")
         page.click("input[name=export-source][value=c-alice]")

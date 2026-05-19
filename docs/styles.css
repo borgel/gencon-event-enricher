@@ -638,3 +638,62 @@ body.drawer-open #drawer-backdrop {
   color: #c0382c;
   border-color: #e2b8b3;
 }
+
+/* Base64 share/paste modals */
+.modal .action-row.column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.modal .blob-textarea {
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  width: 100%;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  box-sizing: border-box;
+  word-break: break-all;
+}
+.modal .copied-status {
+  font-size: 12px;
+  color: #16a34a;
+  margin-right: auto;
+  align-self: center;
+}
+.modal .paste-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+.modal .paste-error.hidden { display: none; }
+
+/* Sidebar Schedule section: prominent blob buttons, demoted CSV details */
+#f-share,
+#f-paste {
+  font: inherit;
+  padding: 0.3rem 0.6rem;
+  width: 100%;
+  display: block;
+  margin-bottom: 4px;
+  text-align: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+#f-share:hover,
+#f-paste:hover { background: #f0f0f0; }
+details.csv-advanced {
+  margin-top: 8px;
+  font-size: 12px;
+}
+details.csv-advanced > summary {
+  cursor: pointer;
+  color: #555;
+  padding: 2px 0;
+}
+details.csv-advanced[open] > summary {
+  margin-bottom: 4px;
+}

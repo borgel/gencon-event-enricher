@@ -87,6 +87,46 @@
   </div>
 </div>
 
+<div id="share-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <h3>Share schedule</h3>
+    <form id="share-form">
+      <div id="share-sources"></div>
+      <label class="action-row">
+        <span>Name for this share:</span>
+        <input type="text" id="share-name" placeholder="Your name">
+      </label>
+      <label class="action-row column">
+        <span>Copy this text and send it to a friend:</span>
+        <textarea id="share-blob" class="blob-textarea" readonly rows="6"></textarea>
+      </label>
+    </form>
+    <div class="modal-actions">
+      <span id="share-copied-status" class="copied-status" aria-live="polite"></span>
+      <button type="button" class="cancel-btn">Close</button>
+      <button type="button" class="confirm-btn" id="share-copy">Copy</button>
+    </div>
+  </div>
+</div>
+
+<div id="paste-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-content">
+    <h3>Paste schedule</h3>
+    <form id="paste-form">
+      <label class="action-row column">
+        <span>Paste the shared text here:</span>
+        <textarea id="paste-blob" class="blob-textarea" rows="6"
+          placeholder="GENCON1:…"></textarea>
+      </label>
+      <p id="paste-error" class="paste-error hidden" role="alert"></p>
+    </form>
+    <div class="modal-actions">
+      <button type="button" class="cancel-btn">Cancel</button>
+      <button type="button" class="confirm-btn" id="paste-decode">Decode</button>
+    </div>
+  </div>
+</div>
+
 <div id="manage-modal" class="modal hidden" role="dialog" aria-modal="true">
   <div class="modal-content">
     <h3>Manage friend's lists</h3>
